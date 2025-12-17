@@ -1,10 +1,11 @@
 import pandas as pd
-import sqlite3
+from sqlalchemy import create_engine
 import os
 
 # --- CONFIGURAÇÃO ---
-BASE_DIR = os.getcwd()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CAMINHO_DB = os.path.join(BASE_DIR, 'vendas_novoon.db')
+CONNECTION_STRING = f"sqlite:///{CAMINHO_DB}"
 
 # Novoon gera os arquivos em 'Dados/Novoon/planilhas limpas'
 PASTA_CONSOLIDADA = os.path.join(BASE_DIR, 'Dados', 'Novoon', 'planilhas limpas')
@@ -21,11 +22,15 @@ def limpar_nome_tabela(nome_arquivo):
 
 def criar_banco_dados():
     print("="*80)
-    print("CRIANDO BANCO DE DADOS SQL (NOVOON)")
-    print(f"Arquivo do Banco: {CAMINHO_DB}")
+    print("CRIANDO BANCO DE DADOS SQL (NOVOON) - VIA SQLALCHEMY")
+    print(f"Connection String: {CONNECTION_STRING}")
     print("="*80)
 
-    conn = sqlite3.connect(CAMINHO_DB)
+    try:
+        engine = create_engine(CONNECTION_STRING)
+    except Exception as e:
+        print(f"Erro ao criar engine: {e}")
+        return
     
     total_tabelas = 0
     total_linhas = 0
@@ -45,7 +50,6 @@ def criar_banco_dados():
                 df.columns = df.columns.str.strip()
                 
                 # --- NORMALIZAÇÃO PARA API (Snake Case) ---
-                # O API espera: faturamento, lucro_liquido, comissoes, frete, produto, cidade, uf
                 mapa_api = {
                     'Faturamento': 'faturamento',
                     'Lucro Bruto': 'lucro_liquido',
@@ -60,14 +64,11 @@ def criar_banco_dados():
                     'MarketPlace': 'MarketPlace'
                 }
                 
-                # Renomeia
                 df.rename(columns=mapa_api, inplace=True)
-                
-                # Garante que colunas restantes estejam em minusculo e sem espaços
                 df.columns = [c.lower().replace(' ', '_') for c in df.columns]
 
                 # Salva no SQL
-                df.to_sql(nome_tabela, conn, if_exists='replace', index=False)
+                df.to_sql(nome_tabela, engine, if_exists='replace', index=False)
                 
                 qtd = len(df)
                 print(f"   ✅ Tabela criada: {nome_tabela:<30} ({qtd} registros)")
@@ -85,7 +86,6 @@ def criar_banco_dados():
         arquivos = [f for f in os.listdir(PASTA_CONCILIADA) if f.endswith('.csv')]
         for arquivo in arquivos:
             caminho_completo = os.path.join(PASTA_CONCILIADA, arquivo)
-            # Nome da tabela para conciliados
             nome_tabela = arquivo.lower().replace('.csv', '')
 
             try:
@@ -93,7 +93,6 @@ def criar_banco_dados():
                 df.columns = df.columns.str.strip()
                 
                 # --- NORMALIZAÇÃO PARA API (Snake Case) ---
-                # Mesma lógica para conciliados
                 mapa_api = {
                     'Faturamento': 'faturamento',
                     'Lucro Bruto': 'lucro_liquido',
@@ -110,7 +109,7 @@ def criar_banco_dados():
                 df.rename(columns=mapa_api, inplace=True)
                 df.columns = [c.lower().replace(' ', '_') for c in df.columns]
 
-                df.to_sql(nome_tabela, conn, if_exists='replace', index=False)
+                df.to_sql(nome_tabela, engine, if_exists='replace', index=False)
                 qtd = len(df)
                 print(f"   ✅ Tabela criada: {nome_tabela:<30} ({qtd} registros)")
                 total_tabelas += 1
@@ -118,7 +117,6 @@ def criar_banco_dados():
             except Exception as e:
                 print(f"   ❌ Erro ao processar {arquivo}: {e}")
 
-    conn.close()
     print("\n" + "="*80)
     print("PROCESSO FINALIZADO COM SUCESSO!")
     print(f"   - Tabelas criadas: {total_tabelas}")

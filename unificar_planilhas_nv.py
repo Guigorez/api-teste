@@ -32,8 +32,34 @@ COLUNAS_PADRAO = [
     'Frete',
     'Comissões',
     'Custo Operacional',
-    'Lucro Bruto'
+    'Lucro Bruto',
+    'mes_num_filtro',
+    'data_filtro',
+    'uf_norm'
 ]
+
+# --- FUNÇÕES DE LIMPEZA ---
+ESTADO_PARA_UF = {
+    'ACRE': 'AC', 'ALAGOAS': 'AL', 'AMAZONAS': 'AM', 'AMAPA': 'AP', 'AMAPÁ': 'AP',
+    'BAHIA': 'BA', 'CEARA': 'CE', 'CEARÁ': 'CE', 'DISTRITO FEDERAL': 'DF',
+    'ESPIRITO SANTO': 'ES', 'ESPÍRITO SANTO': 'ES', 'GOIAS': 'GO', 'GOIÁS': 'GO',
+    'MARANHAO': 'MA', 'MARANHÃO': 'MA', 'MATO GROSSO': 'MT', 'MATO GROSSO DO SUL': 'MS',
+    'MINAS GERAIS': 'MG', 'PARA': 'PA', 'PARÁ': 'PA', 'PARAIBA': 'PB', 'PARAÍBA': 'PB',
+    'PARANA': 'PR', 'PARANÁ': 'PR', 'PERNAMBUCO': 'PE', 'PIAUI': 'PI', 'PIAUÍ': 'PI',
+    'RIO DE JANEIRO': 'RJ', 'RIO GRANDE DO NORTE': 'RN', 'RIO GRANDE DO SUL': 'RS',
+    'RONDONIA': 'RO', 'RONDÔNIA': 'RO', 'RORAIMA': 'RR', 'SANTA CATARINA': 'SC',
+    'SAO PAULO': 'SP', 'SÃO PAULO': 'SP', 'SERGIPE': 'SE', 'TOCANTINS': 'TO'
+}
+MESES_ORDEM = {
+    'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4, 'Maio': 5, 'Junho': 6,
+    'Julho': 7, 'Agosto': 8, 'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
+}
+
+def normalize_uf(val):
+    val_str = str(val).upper().strip()
+    if len(val_str) == 2:
+        return val_str
+    return ESTADO_PARA_UF.get(val_str, val_str)
 
 def consolidar_marketplaces():
     print("="*80)
@@ -157,7 +183,23 @@ def consolidar_marketplaces():
 
     df_total = unificar_nomes_produtos(df_total)
 
-    # Salvar
+    # Convertendo dia/mes/ano para inteiros onde possivel
+    for col in ['dia', 'ano']:
+        if col in df_total.columns:
+            df_total[col] = pd.to_numeric(df_total[col], errors='coerce').fillna(0).astype(int)
+
+    # Pre-processamento de Datas e UF (Otimização API)
+    print("... Calculando datas e normalizando UF ...")
+    if 'mes' in df_total.columns:
+        df_total['mes_num_filtro'] = df_total['mes'].map(MESES_ORDEM).fillna(0).astype(int)
+    
+    if 'ano' in df_total.columns and 'dia' in df_total.columns and 'mes_num_filtro' in df_total.columns:
+        df_total['data_filtro'] = pd.to_datetime(dict(year=df_total['ano'], month=df_total['mes_num_filtro'], day=df_total['dia']), errors='coerce')
+    
+    if 'UF' in df_total.columns:
+        df_total['uf_norm'] = df_total['UF'].apply(normalize_uf)
+    else:
+        df_total['uf_norm'] = ''
     if not os.path.exists(PASTA_SAIDA):
         os.makedirs(PASTA_SAIDA)
     path_saida = os.path.join(PASTA_SAIDA, ARQUIVO_FINAL)

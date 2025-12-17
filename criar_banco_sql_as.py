@@ -1,13 +1,17 @@
 import pandas as pd
-import sqlite3
+from sqlalchemy import create_engine
 import os
 
 # --- CONFIGURAÇÃO ---
-CAMINHO_DB = r'C:\Users\MatheusSampaio\Documents\AnimoShop - Python\vendas_animoshop.db'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Se quiser Postgres, pasta mudar esta string ou usar env vars no futuro
+CAMINHO_DB = os.path.join(BASE_DIR, 'vendas_animoshop.db')
+CONNECTION_STRING = f"sqlite:///{CAMINHO_DB}"
 
 DIRETORIOS = {
-    'CONSOLIDADO': r'C:\Users\MatheusSampaio\Documents\AnimoShop - Python\Dados\AnimoShop\planilhas limpas',
-    'CONCILIADO':  r'C:\Users\MatheusSampaio\Documents\AnimoShop - Python\Dados\AnimoShop\planilhas atom'
+    'CONSOLIDADO': os.path.join(BASE_DIR, 'Dados', 'AnimoShop', 'planilhas limpas'),
+    'CONCILIADO':  os.path.join(BASE_DIR, 'Dados', 'AnimoShop', 'planilhas atom')
 }
 
 def limpar_nome_tabela(nome_arquivo):
@@ -21,13 +25,19 @@ def limpar_nome_tabela(nome_arquivo):
 
 def criar_banco_dados():
     print("="*80)
-    print("CRIANDO BANCO DE DADOS SQL (MASTER)")
-    print(f"Arquivo do Banco: {CAMINHO_DB}")
+    print("CRIANDO BANCO DE DADOS SQL (MASTER) - VIA SQLALCHEMY")
+    print(f"Connection String: {CONNECTION_STRING}")
     print("="*80)
 
-    # Conecta ao banco (Cria o arquivo se não existir)
-    conn = sqlite3.connect(CAMINHO_DB)
-    cursor = conn.cursor()
+    # Cria engine
+    try:
+        engine = create_engine(CONNECTION_STRING)
+        # Testa conexao
+        with engine.connect() as conn:
+            pass
+    except Exception as e:
+        print(f"Erro ao conectar banco: {e}")
+        return
 
     total_tabelas = 0
     total_linhas = 0
@@ -54,9 +64,9 @@ def criar_banco_dados():
                 # Ex: "Lucro Líquido" vira "lucro_liquido"
                 df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_').str.replace('/', '_')
 
-                # Salva no SQL
+                # Salva no SQL usando SQLAlchemy Engine
                 # if_exists='replace' -> Se rodar de novo, ele atualiza a tabela inteira
-                df.to_sql(nome_tabela, conn, if_exists='replace', index=False)
+                df.to_sql(nome_tabela, engine, if_exists='replace', index=False)
                 
                 qtd = len(df)
                 print(f"   ✅ Tabela criada: {nome_tabela:<30} ({qtd} registros)")
@@ -67,7 +77,6 @@ def criar_banco_dados():
             except Exception as e:
                 print(f"   ❌ Erro ao processar {arquivo}: {e}")
 
-    conn.close()
     print("\n" + "="*80)
     print("PROCESSO FINALIZADO COM SUCESSO!")
     print(f"   - Tabelas criadas: {total_tabelas}")

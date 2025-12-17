@@ -1,26 +1,47 @@
-import sqlite3
+from sqlalchemy import create_engine
 import os
 
-# Caminhos dos bancos de dados
+# Determina o diretório raiz do projeto (um nível acima deste arquivo)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Caminhos dos bancos de dados (Relativos ao BASE_DIR)
 DB_PATHS = {
-    'animoshop': r'C:\Users\MatheusSampaio\Documents\AnimoShop - Python\vendas_animoshop.db',
-    'novoon': r'C:\Users\MatheusSampaio\Documents\AnimoShop - Python\vendas_novoon.db'
+    'animoshop': os.path.join(BASE_DIR, 'vendas_animoshop.db'),
+    'novoon': os.path.join(BASE_DIR, 'vendas_novoon.db')
 }
 
-def get_db_connection(company='animoshop'):
-    """Retorna uma conexão com o banco de dados SQLite da empresa especificada."""
+def get_db_engine(company='animoshop'):
+    """
+    Retorna uma ENGINE SQLAlchemy.
+    Suporta troca para PostgreSQL via variável de ambiente.
+    """
     company = company.lower()
-    db_path = DB_PATHS.get(company)
     
-    if not db_path:
-        raise ValueError(f"Empresa desconhecida: {company}")
+    # Check env var specific for company, e.g., NOVOON_DATABASE_URL
+    env_key = f"{company.upper()}_DATABASE_URL"
+    db_url = os.getenv(env_key)
+    
+    if not db_url:
+        # Fallback to SQLite file
+        db_path = DB_PATHS.get(company)
+        if not db_path:
+            raise ValueError(f"Empresa desconhecida: {company}")
+        
+        # SQLite connection string
+        db_url = f"sqlite:///{db_path}"
 
-    if not os.path.exists(db_path):
-        # Se não existir, tenta criar vazio ou avisa (para evitar crash total se um não tiver rodado ainda)
-        # Mas idealmente deve existir. Vamos deixar o erro propagar se não achar, para debug.
-        pass 
-        # raise FileNotFoundError(f"Banco de dados não encontrado em: {db_path}")
-    
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row  # Permite acessar colunas por nome
+    try:
+        engine = create_engine(db_url)
+        return engine
+    except Exception as e:
+        print(f"Erro ao criar engine para {company}: {e}")
+        raise e
+
+def get_db_connection(company='animoshop'):
+    """
+    Retorna uma conexão bruta (RAW) compatível com API legada.
+    Mas agora gerada via SQLAlchemy Engine.
+    """
+    engine = get_db_engine(company)
+    conn = engine.connect() # SQLAlchemy Connection
     return conn

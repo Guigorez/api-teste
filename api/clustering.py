@@ -2,24 +2,20 @@ import pandas as pd
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
-def perform_clustering(start_date=None, end_date=None, source=None, marketplace=None, company='animoshop'):
-    # Importação local para evitar ciclo
-    from .routes import filter_data, get_all_sales_data
 
-    # 1. Obter dados brutos
-    df = get_all_sales_data(company)
-    df = filter_data(df, start_date, end_date, source, marketplace)
-    
-    if df.empty:
-        return []
-
-    # 2. Agregar por Produto
-    # Precisamos de Faturamento (Revenue) e Lucro (Profit) por produto
-    if 'produto' not in df.columns:
-        return []
+def perform_clustering_from_df(product_stats):
+    """
+    Executa o clustering K-Means a partir de um DataFrame JÁ AGREGADO.
+    Esperado: df com colunas ['produto', 'faturamento', 'lucro', 'quantidade']
+    """
+    # Padroniza colunas para o código abaixo
+    # No SQL renomeamos para 'lucro', mas o codigo original usava 'lucro_liquido'
+    if 'lucro' in product_stats.columns:
+        product_stats = product_stats.rename(columns={'lucro': 'lucro_liquido'})
         
-    product_stats = df.groupby('produto')[['faturamento', 'lucro_liquido']].sum().reset_index()
-    
+    if product_stats.empty:
+        return []
+
     # Filtra produtos com faturamento zero ou negativo para não sujar a análise
     product_stats = product_stats[product_stats['faturamento'] > 0]
     
@@ -91,3 +87,9 @@ def perform_clustering(start_date=None, end_date=None, source=None, marketplace=
             "profit": avg_profit
         }
     }
+
+def perform_clustering(start_date=None, end_date=None, source=None, marketplace=None, company='animoshop'):
+    """Deprecated: Use perform_clustering_from_df inves disso."""
+    # Mantendo apenas para retrocompatibilidade se algo chamar, mas vai quebrar se get_all_sales_data não existir
+    # Melhor jogar erro se for chamado
+    raise NotImplementedError("Use perform_clustering_from_df com dados agregados.")

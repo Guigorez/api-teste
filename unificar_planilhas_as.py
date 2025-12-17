@@ -34,7 +34,10 @@ COLUNAS_PADRAO = [
     'Custo Operacional',
     'Lucro Bruto', # Standardizing to Lucro Bruto as per Dashboard
     'contagem_pedidos', # Keeping this as it seems useful
-    'Status'
+    'Status',
+    'mes_num_filtro',
+    'data_filtro',
+    'uf_norm'
 ]
 
 # Mapa de renomeação (Entrada -> Saída)
@@ -54,6 +57,29 @@ MAPA_COLUNAS = {
     'uf': 'UF',
     'cep': 'CEP'
 }
+
+# --- FUNÇÕES DE LIMPEZA ---
+ESTADO_PARA_UF = {
+    'ACRE': 'AC', 'ALAGOAS': 'AL', 'AMAZONAS': 'AM', 'AMAPA': 'AP', 'AMAPÁ': 'AP',
+    'BAHIA': 'BA', 'CEARA': 'CE', 'CEARÁ': 'CE', 'DISTRITO FEDERAL': 'DF',
+    'ESPIRITO SANTO': 'ES', 'ESPÍRITO SANTO': 'ES', 'GOIAS': 'GO', 'GOIÁS': 'GO',
+    'MARANHAO': 'MA', 'MARANHÃO': 'MA', 'MATO GROSSO': 'MT', 'MATO GROSSO DO SUL': 'MS',
+    'MINAS GERAIS': 'MG', 'PARA': 'PA', 'PARÁ': 'PA', 'PARAIBA': 'PB', 'PARAÍBA': 'PB',
+    'PARANA': 'PR', 'PARANÁ': 'PR', 'PERNAMBUCO': 'PE', 'PIAUI': 'PI', 'PIAUÍ': 'PI',
+    'RIO DE JANEIRO': 'RJ', 'RIO GRANDE DO NORTE': 'RN', 'RIO GRANDE DO SUL': 'RS',
+    'RONDONIA': 'RO', 'RONDÔNIA': 'RO', 'RORAIMA': 'RR', 'SANTA CATARINA': 'SC',
+    'SAO PAULO': 'SP', 'SÃO PAULO': 'SP', 'SERGIPE': 'SE', 'TOCANTINS': 'TO'
+}
+MESES_ORDEM = {
+    'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4, 'Maio': 5, 'Junho': 6,
+    'Julho': 7, 'Agosto': 8, 'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
+}
+
+def normalize_uf(val):
+    val_str = str(val).upper().strip()
+    if len(val_str) == 2:
+        return val_str
+    return ESTADO_PARA_UF.get(val_str, val_str)
 
 def consolidar_marketplaces():
     print("="*80)
@@ -123,6 +149,19 @@ def consolidar_marketplaces():
     # Convertendo dia/mes/ano para inteiros onde possivel para ficar bonito
     for col in ['dia', 'ano']:
         df_total[col] = pd.to_numeric(df_total[col], errors='coerce').fillna(0).astype(int)
+
+    # Pre-processamento de Datas
+    print("... Calculando datas e normalizando UF ...")
+    df_total['mes_num_filtro'] = df_total['mes'].map(MESES_ORDEM).fillna(0).astype(int)
+    
+    # Cria data_filtro (YYYY-MM-DD)
+    df_total['data_filtro'] = pd.to_datetime(dict(year=df_total['ano'], month=df_total['mes_num_filtro'], day=df_total['dia']), errors='coerce')
+    
+    # Normaliza UF
+    if 'UF' in df_total.columns:
+        df_total['uf_norm'] = df_total['UF'].apply(normalize_uf)
+    else:
+        df_total['uf_norm'] = ''
 
     # Salvar
     if not os.path.exists(PASTA_SAIDA):

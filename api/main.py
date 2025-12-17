@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from .logger import setup_logging
 from .routes import router
+
+# Inicializa logs
+setup_logging()
 
 app = FastAPI(
     title="AnimoShop Dashboard API",
