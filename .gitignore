@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+
+# Data & Large Files
+Dados/
+OLD/
+*.db
+*.sqlite3
+*.csv
+*.xlsx
+*.log
+
+# Dashboard / Node
+node_modules/
+dist/
+build/
+.DS_Store
