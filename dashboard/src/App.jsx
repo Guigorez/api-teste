@@ -1,21 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import MarketplaceChart from './components/MarketplaceChart';
-import PaymentChart from './components/PaymentChart';
-import CostChart from './components/CostChart';
-import { getResumo, getMensal, getDiario, getSemanal, getAnual, getTopProdutos, processData, getGeoSales, getMarketplace, getPagamentos } from './services/api';
-import SummaryCards from './components/SummaryCards';
-import TimeAnalysis from './components/TimeAnalysis';
-import TopProducts from './components/TopProducts';
-import DateFilter from './components/DateFilter';
-import SalesMap from './components/SalesMap';
+import { getResumo, getMensal, getDiario, getSemanal, getAnual, getTopProdutos, processData, getGeoSales, getMarketplace, getPagamentos, getForecast, getClustering, getBundles } from './services/api';
 import Sidebar from './components/Sidebar';
 import ThemeToggle from './components/ThemeToggle';
+import DateFilter from './components/DateFilter';
 import { RefreshCw, Search, Bell, Plus } from 'lucide-react';
+
+// Paginas
+import Overview from './pages/Overview';
+import SalesProducts from './pages/SalesProducts';
+import Financials from './pages/Financials';
+import Intelligence from './pages/Intelligence';
+import Opportunities from './pages/Opportunities';
 
 function App() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({});
   const [company, setCompany] = useState('animoshop'); // 'animoshop' or 'novoon'
+
+  // Navigation State
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Data State
   const [resumo, setResumo] = useState(null);
   const [mensal, setMensal] = useState([]);
   const [diario, setDiario] = useState([]);
@@ -25,6 +30,9 @@ function App() {
   const [geoData, setGeoData] = useState([]);
   const [marketplaceData, setMarketplaceData] = useState([]);
   const [paymentData, setPaymentData] = useState([]);
+  const [forecastData, setForecastData] = useState([]);
+  const [clusteringData, setClusteringData] = useState(null);
+  const [bundlesData, setBundlesData] = useState([]);
   const [topProductsSort, setTopProductsSort] = useState('faturamento');
   const [processing, setProcessing] = useState(false);
 
@@ -34,7 +42,7 @@ function App() {
       // Include company in filters
       const currentFilters = { ...filters, company };
 
-      const [resumoData, mensalData, diarioData, semanalData, anualData, topData, geoDataRes, marketplaceRes, paymentRes] = await Promise.all([
+      const [resumoData, mensalData, diarioData, semanalData, anualData, topData, geoDataRes, marketplaceRes, paymentRes, forecastRes, clusteringRes, bundlesRes] = await Promise.all([
         getResumo(currentFilters),
         getMensal(currentFilters),
         getDiario(currentFilters),
@@ -43,7 +51,10 @@ function App() {
         getTopProdutos(10, currentFilters, topProductsSort),
         getGeoSales(currentFilters),
         getMarketplace(currentFilters),
-        getPagamentos(currentFilters)
+        getPagamentos(currentFilters),
+        getForecast(currentFilters),
+        getClustering(currentFilters),
+        getBundles(currentFilters)
       ]);
 
       setResumo(resumoData);
@@ -55,6 +66,9 @@ function App() {
       setGeoData(geoDataRes);
       setMarketplaceData(marketplaceRes);
       setPaymentData(paymentRes);
+      setForecastData(forecastRes);
+      setClusteringData(clusteringRes);
+      setBundlesData(bundlesRes);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
     } finally {
@@ -85,7 +99,39 @@ function App() {
   };
 
   const handleFilter = (newFilters) => {
-    setFilters(newFilters);
+    // Prevent infinite loop by checking if filters actually changed
+    if (JSON.stringify(newFilters) !== JSON.stringify(filters)) {
+      setFilters(newFilters);
+    }
+  };
+
+  // Renderiza o conteúdo base na aba ativa
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return <Overview resumo={resumo} marketplaceData={marketplaceData} geoData={geoData} />;
+      case 'sales':
+        return (
+          <SalesProducts
+            diario={diario}
+            semanal={semanal}
+            mensal={mensal}
+            anual={anual}
+            topProdutos={topProdutos}
+            topProductsSort={topProductsSort}
+            onSortChange={setTopProductsSort}
+            paymentData={paymentData}
+          />
+        );
+      case 'financials':
+        return <Financials mensal={mensal} />;
+      case 'intelligence':
+        return <Intelligence forecastData={forecastData} clusteringData={clusteringData} />;
+      case 'opportunities':
+        return <Opportunities bundlesData={bundlesData} />;
+      default:
+        return <Overview resumo={resumo} marketplaceData={marketplaceData} geoData={geoData} />;
+    }
   };
 
   if (loading && !resumo) {
@@ -98,13 +144,19 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-200 font-sans">
-      <Sidebar />
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="lg:ml-64 p-8 transition-all duration-300">
         {/* Header Section */}
         <header className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Quadro Geral</h1>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
+              {activeTab === 'overview' && 'Visão Geral'}
+              {activeTab === 'sales' && 'Vendas & Produtos'}
+              {activeTab === 'financials' && 'Financeiro'}
+              {activeTab === 'intelligence' && 'Inteligência'}
+              {activeTab === 'opportunities' && 'Oportunidades'}
+            </h1>
           </div>
 
           <div className="flex items-center gap-4">
@@ -168,53 +220,9 @@ function App() {
           <DateFilter onFilter={handleFilter} />
         </div>
 
-        {/* Dashboard Content */}
-        <SummaryCards data={resumo} />
+        {/* Dynamic Content */}
+        {renderContent()}
 
-        {/* Row 1: Time Analysis & Marketplace */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Histórico de Faturamento</h3>
-            <TimeAnalysis
-              diario={diario}
-              semanal={semanal}
-              mensal={mensal}
-              anual={anual}
-            />
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Composição</h3>
-            <MarketplaceChart data={marketplaceData} />
-          </div>
-        </div>
-
-        {/* Full Width Sections */}
-        <div className="space-y-8">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Análise de Custos</h3>
-            <CostChart data={mensal} />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-              <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Mapa de Vendas</h3>
-              <SalesMap data={geoData} />
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-              <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Top Produtos</h3>
-              <TopProducts
-                data={topProdutos}
-                sortBy={topProductsSort}
-                onSortChange={setTopProductsSort}
-              />
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Pagamentos</h3>
-            <PaymentChart data={paymentData} />
-          </div>
-        </div>
       </main>
     </div>
   );

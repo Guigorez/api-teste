@@ -84,6 +84,7 @@ const SalesMap = ({ data }) => {
                                                 uf_sigla: uf,
                                                 quantity,
                                                 revenue,
+                                                shipping: stateData ? stateData.frete_medio : 0,
                                                 x: rect.left + rect.width / 2,
                                                 y: rect.top
                                             });
@@ -112,6 +113,9 @@ const SalesMap = ({ data }) => {
                             </p>
                             <p className="text-blue-600 dark:text-blue-400 font-semibold">
                                 <span className="text-gray-500 dark:text-gray-400 font-normal">Fat:</span> {formatCurrency(tooltip.revenue)}
+                            </p>
+                            <p className="text-orange-600 dark:text-orange-400 font-semibold">
+                                <span className="text-gray-500 dark:text-gray-400 font-normal">Frete Médio:</span> {formatCurrency(tooltip.shipping)}
                             </p>
                         </div>
                     </div>

@@ -1,5 +1,9 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from .database import get_db_connection
+from .forecast import generate_forecast
+from .clustering import perform_clustering
+from .elasticity import calculate_elasticity
+from .bundles import calculate_bundles
 import pandas as pd
 import threading
 import time
@@ -414,13 +418,82 @@ def get_vendas_geo(start_date: str = None, end_date: str = None, source: str = N
 
     # Usa UF normalizada pré-processada
     if 'uf_norm' in df.columns:
-        grupo = df.groupby('uf_norm')[['faturamento', 'contagem_pedidos']].sum().reset_index()
+        # Prepara colunas para agregação
+        cols_agg = {
+            'faturamento': 'sum',
+            'contagem_pedidos': 'sum'
+        }
+        
+        # Garante que frete existe e é positivo para cálculo de média
+        if 'frete' in df.columns:
+            df['frete_abs'] = df['frete'].abs()
+            cols_agg['frete_abs'] = 'sum' # Somamos o total para depois dividir
+            
+        grupo = df.groupby('uf_norm').agg(cols_agg).reset_index()
         grupo = grupo.rename(columns={'uf_norm': 'uf'})
+        
+        # Calcula frete médio
+        if 'frete_abs' in grupo.columns:
+            grupo['frete_medio'] = grupo['frete_abs'] / grupo['contagem_pedidos']
+            grupo['frete_medio'] = grupo['frete_medio'].fillna(0)
+        else:
+            grupo['frete_medio'] = 0.0
+
         # Filtra apenas UFs válidas (2 letras)
         grupo = grupo[grupo['uf'].str.len() == 2]
         return grupo.to_dict(orient='records')
     
     return []
+
+@router.get("/forecast/sales")
+def get_sales_forecast(months: int = 6, company: str = 'animoshop'):
+    """Retorna dados históricos e previsão para os próximos N meses."""
+    try:
+        return generate_forecast(company, months)
+    except Exception as e:
+        print(f"Erro no forecast: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analysis/clustering")
+def get_product_clustering(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
+    """Retorna clusterização de produtos (K-Means) baseada em Faturamento vs Lucro."""
+    try:
+        return perform_clustering(start_date, end_date, source, marketplace, company)
+    except Exception as e:
+        print(f"Erro no clustering: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analysis/elasticity")
+def get_price_elasticity(product_name: str, company: str = 'animoshop'):
+    """Calcula elasticidade de preço e preço ótimo para um produto."""
+    try:
+        result = calculate_elasticity(product_name, company)
+        if not result:
+             raise HTTPException(status_code=404, detail="Produto não encontrado ou sem dados suficientes.")
+        return result
+    except Exception as e:
+        print(f"Erro na elasticidade: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analysis/bundles")
+def get_bundle_suggestions(min_lift: float = 1.1, min_confidence: float = 0.3, company: str = 'animoshop'):
+    """Retorna sugestões de kits (Market Basket Analysis)."""
+    try:
+        results = calculate_bundles(company, min_lift, min_confidence)
+        return results
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Biblioteca 'mlxtend' não instalada. Execute: pip install mlxtend")
+    except Exception as e:
+        print(f"Erro em bundles: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # Adiciona o diretório raiz ao path para importar o etl_pipeline
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

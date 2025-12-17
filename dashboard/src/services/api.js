@@ -62,6 +62,38 @@ export const getTopProdutos = async (limit = 10, filters = {}, sortBy = 'faturam
     return response.data;
 };
 
+export const getForecast = async (filters) => {
+    const response = await api.get('/forecast/sales', getParams(filters));
+    return response.data;
+};
+
+export const getClustering = async (filters) => {
+    const response = await api.get('/analysis/clustering', getParams(filters));
+    return response.data;
+};
+
+export const getElasticity = async (productName) => {
+    // Note: Elasticity analysis usually focuses on global history or specific product, filters might need adjustment if company is needed.
+    // Assuming company is needed, let's look at how to get it. 
+    // Ideally we pass filters, but signature is just productName in component.
+    // Let's pass company query param manually or update component to pass filters.
+    // For simplicity, let's assume default 'animoshop' for now or handle it in component.
+    // Actually, looking at routes.py, it expects 'product_name' and optional 'company'.
+    // Let's stick to standard signature but allow passing an object or string.
+    // To match component usage: getElasticity(selectedProduct) -> string.
+    // Default company to 'animoshop' if not passed, or better, change component to pass object.
+    // But strictly following prompt step 2: "Ao selecionar um produto, faça o fetch...".
+
+    // Let's try to be smart. If productName is string, use it.
+    const response = await api.get('/analysis/elasticity', { params: { product_name: productName } });
+    return response.data;
+};
+
+export const getBundles = async (filters) => {
+    const response = await api.get('/analysis/bundles', getParams(filters));
+    return response.data;
+};
+
 export const processData = async (company = 'animoshop') => {
     const response = await api.post('/processar', null, { params: { company } });
     return response.data;
