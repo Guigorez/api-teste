@@ -15,29 +15,42 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { getElasticity, getTopProdutos } from '../services/api';
 
-const ElasticityChart = () => {
+const ElasticityChart = ({ filters }) => {
     const { theme } = useTheme();
     const [loading, setLoading] = useState(false);
     const [products, setProducts] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState('');
     const [data, setData] = useState(null);
 
-    // Carrega lista de produtos ao montar
+    // Carrega lista de produtos ao montar ou quando filtros mudam
+    // Carrega lista de produtos ao montar ou quando filtros mudam
     useEffect(() => {
         const loadProducts = async () => {
+            // Usa apenas o filtro de empresa para listar produtos (All Time), ignorando datas
+            const productFilters = { company: filters?.company };
+
             // Pega top 20 produtos para o dropdown
-            const top = await getTopProdutos(20);
+            const top = await getTopProdutos(20, productFilters);
             if (top && top.length > 0) {
                 setProducts(top);
-                setSelectedProduct(top[0].produto); // Seleciona o primeiro
+                // Se o produto selecionado não estiver na nova lista, seleciona o primeiro
+                if (!selectedProduct || !top.find(p => p.produto === selectedProduct)) {
+                    setSelectedProduct(top[0].produto);
+                }
+            } else {
+                setProducts([]);
+                setSelectedProduct('');
             }
         };
         loadProducts();
-    }, []);
+    }, [filters?.company]); // Recarrega apenas se a empresa mudar
 
     // Carrega dados de elasticidade quando o produto muda
     useEffect(() => {
-        if (!selectedProduct) return;
+        if (!selectedProduct) {
+            setData(null);
+            return;
+        }
 
         const fetchData = async () => {
             setLoading(true);
@@ -54,9 +67,9 @@ const ElasticityChart = () => {
         fetchData();
     }, [selectedProduct]);
 
-    if (!products.length) return null;
-
     const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+    if (!products.length && loading) return null; // Wait for initial load
 
     return (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
@@ -177,8 +190,15 @@ const ElasticityChart = () => {
                 </>
             ) : (
                 <div className="h-64 flex flex-col items-center justify-center text-center p-6 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
-                    <p className="text-gray-500 mb-2">Não foi possível calcular a elasticidade para este produto.</p>
-                    <p className="text-xs text-gray-400">Pode haver poucos dados históricos ou variação de preço insuficiente.</p>
+                    <p className="text-gray-500 mb-2">
+                        {!products.length ? "Nenhum produto encontrado para análise." : "Não foi possível calcular a elasticidade para este produto."}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                        debug: {JSON.stringify(filters)} <br />
+                        len: {products.length} <br />
+                        sel: "{selectedProduct}" <br />
+                        p0: {JSON.stringify(products[0])}
+                    </p>
                 </div>
             )}
         </div>

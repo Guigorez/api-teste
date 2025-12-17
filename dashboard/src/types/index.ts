@@ -46,7 +46,7 @@ export interface GeoData {
 }
 
 export interface MarketplaceData {
-    MarketPlace: string;
+    marketplace: string;
     faturamento: number;
     lucro_liquido: number;
     contagem_pedidos: number;

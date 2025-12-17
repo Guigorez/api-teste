@@ -12,12 +12,16 @@ import { RefreshCw, Search, Bell, Plus } from 'lucide-react';
 
 // Paginas (Assuming they are still .jsx, TS allows importing .jsx if allowed in config)
 // I will eventually migrate them too.
+// Paginas (Assuming they are still .jsx, TS allows importing .jsx if allowed in config)
+// I will eventually migrate them too.
 import Overview from './pages/Overview';
 import SalesProducts from './pages/SalesProducts';
 import Financials from './pages/Financials';
 import Intelligence from './pages/Intelligence';
 import Opportunities from './pages/Opportunities';
 import { Filters } from './types';
+
+console.log("App Module Loaded");
 
 function App() {
     const queryClient = useQueryClient();
@@ -34,7 +38,7 @@ function App() {
     // --- QUERIES ---
 
     // 1. Visão Geral
-    const { data: resumo, isLoading: loadingResumo } = useQuery({
+    const { data: resumo, isLoading: loadingResumo, isError: errorResumo } = useQuery({
         queryKey: ['resumo', queryFilters],
         queryFn: () => getResumo(queryFilters),
         staleTime: 1000 * 60 * 5,
@@ -92,8 +96,30 @@ function App() {
         }
     };
 
+
+    // Debug Logs
+    console.log("App Render State:", { loadingResumo, errorResumo, filters });
+
     // Renderiza o conteúdo base na aba ativa
     const renderContent = () => {
+        if (loadingResumo) {
+            return (
+                <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FF6B00]"></div>
+                    <span className="ml-4 text-gray-500">Carregando dados...</span>
+                </div>
+            );
+        }
+
+        if (errorResumo) {
+            return (
+                <div className="flex flex-col items-center justify-center h-64 text-red-500">
+                    <h2 className="text-xl font-bold mb-2">Erro de Conexão</h2>
+                    <p>Não foi possível conectar à API.</p>
+                </div>
+            )
+        }
+
         switch (activeTab) {
             case 'overview':
                 return <Overview resumo={resumo} marketplaceData={marketplaceData || []} geoData={geoData || []} />;
@@ -113,21 +139,13 @@ function App() {
             case 'financials':
                 return <Financials mensal={mensal || []} />;
             case 'intelligence':
-                return <Intelligence forecastData={forecastData || []} clusteringData={clusteringData} />;
+                return <Intelligence forecastData={forecastData || []} clusteringData={clusteringData} filters={queryFilters} />;
             case 'opportunities':
                 return <Opportunities bundlesData={bundlesData || []} />;
             default:
                 return <Overview resumo={resumo} marketplaceData={marketplaceData} geoData={geoData} />;
         }
     };
-
-    if (loadingResumo) {
-        return (
-            <div className="min-h-screen bg-[#F4F5F7] dark:bg-gray-900 flex items-center justify-center transition-colors duration-200">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FF6B00]"></div>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-[#F4F5F7] dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-200 font-sans">
@@ -205,7 +223,6 @@ function App() {
                 </div>
 
                 {renderContent()}
-
             </main>
         </div>
     );

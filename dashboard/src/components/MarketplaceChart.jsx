@@ -58,7 +58,7 @@ const renderActiveShape = (props) => {
             />
             <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
             <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
-            <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill={theme === 'dark' ? '#fff' : '#374151'} className="font-medium">{payload.MarketPlace}</text>
+            <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill={theme === 'dark' ? '#fff' : '#374151'} className="font-medium">{payload.marketplace}</text>
             <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999" className="text-xs">
                 {`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
             </text>
@@ -94,12 +94,12 @@ const MarketplaceChart = ({ data }) => {
                             outerRadius={90}
                             fill="#8884d8"
                             dataKey="faturamento"
-                            nameKey="MarketPlace"
+                            nameKey="marketplace"
                             onMouseEnter={onPieEnter}
                             paddingAngle={2}
                         >
                             {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={getColor(entry.MarketPlace, index)} strokeWidth={0} />
+                                <Cell key={`cell-${index}`} fill={getColor(entry.marketplace, index)} strokeWidth={0} />
                             ))}
                         </Pie>
                         <Legend

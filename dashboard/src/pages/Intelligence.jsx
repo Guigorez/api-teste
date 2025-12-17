@@ -1,13 +1,14 @@
 import React from 'react';
 import ForecastChart from '../components/ForecastChart';
+
 import ClusterChart from '../components/ClusterChart';
 import ElasticityChart from '../components/ElasticityChart';
 
-const Intelligence = ({ forecastData, clusteringData }) => {
+const Intelligence = ({ forecastData, clusteringData, filters }) => {
     return (
         <div className="space-y-8 animate-fade-in">
             {/* Seção 1: Previsão de Demanda */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="w-full">
                 <ForecastChart data={forecastData} />
             </div>
 
@@ -17,9 +18,8 @@ const Intelligence = ({ forecastData, clusteringData }) => {
                     <ClusterChart data={clusteringData} />
                 </div>
 
-                {/* Seção 3: Elasticidade */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <ElasticityChart />
+                    <ElasticityChart filters={filters} />
                 </div>
             </div>
         </div>

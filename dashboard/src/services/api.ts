@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Filters, SummaryData, MonthlyData, TopProduct, GeoData, MarketplaceData } from '../types';
 
 const api = axios.create({
-    baseURL: 'http://localhost:8000/api',
+    baseURL: '/api', // Uses Vite Proxy
 });
 
 const getParams = (filters?: Filters) => {
@@ -75,6 +75,11 @@ export const getClustering = async (filters?: Filters): Promise<any> => {
 
 export const getBundles = async (filters?: Filters): Promise<any> => {
     const response = await api.get('/analysis/bundles', getParams(filters));
+    return response.data;
+};
+
+export const getElasticity = async (productName: string): Promise<any> => {
+    const response = await api.get('/analysis/elasticity', { params: { product_name: productName } });
     return response.data;
 };
 

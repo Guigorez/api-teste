@@ -17,6 +17,7 @@ createRoot(rootElement).render(
             <ErrorBoundary>
                 <ThemeProvider>
                     <App />
+                    {/* <SimpleApp /> */}
                 </ThemeProvider>
             </ErrorBoundary>
         </QueryClientProvider>

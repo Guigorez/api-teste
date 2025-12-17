@@ -1,7 +1,7 @@
 import pandas as pd
 
 def calculate_bundles(company='animoshop', min_lift=1.1, min_confidence=0.3):
-    from .routes import get_all_sales_data
+    from .routes import get_filtered_query
     try:
         from mlxtend.frequent_patterns import fpgrowth, association_rules
         from mlxtend.preprocessing import TransactionEncoder
@@ -11,7 +11,12 @@ def calculate_bundles(company='animoshop', min_lift=1.1, min_confidence=0.3):
 
     
     # 1. Obter dados
-    df = get_all_sales_data(company)
+    base_query, conn = get_filtered_query(company)
+    if not base_query: return []
+    
+    query = f"SELECT * FROM ({base_query})"
+    df = pd.read_sql_query(query, conn)
+    conn.close()
     
     if df.empty or 'produto' not in df.columns:
         return []
@@ -24,7 +29,7 @@ def calculate_bundles(company='animoshop', min_lift=1.1, min_confidence=0.3):
         # Tenta criar se não existir (muito improvável dado o ETL)
         pass 
         
-    df['txn_id'] = df['MarketPlace'].astype(str) + "_" + df['data_filtro'].astype(str)
+    df['txn_id'] = df['marketplace'].astype(str) + "_" + df['data_filtro'].astype(str)
     
     # Se tiver hora, refina
     # (Assumindo que talvez não tenhamos hora estruturada em todas as tabelas, vamos usar o que der)
@@ -76,7 +81,8 @@ def calculate_bundles(company='animoshop', min_lift=1.1, min_confidence=0.3):
     rules = rules[rules['confidence'] >= min_confidence]
     
     # Ordena por Lift
-    rules = rules.sort_values(by='lift', ascending=False)
+    # Ordena por Lift e limita a 50 melhores para não quebrar o frontend
+    rules = rules.sort_values(by='lift', ascending=False).head(50)
     
     # Formata output para JSON
     results = []

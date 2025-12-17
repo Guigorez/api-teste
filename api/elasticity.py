@@ -4,16 +4,26 @@ from sklearn.linear_model import LinearRegression
 
 def calculate_elasticity(product_name: str, company='animoshop'):
     # Importação local para evitar ciclo
-    from .routes import get_all_sales_data
+    from .routes import get_filtered_query
     
-    # 1. Obter dados
-    df = get_all_sales_data(company)
-    
-    if df.empty or 'produto' not in df.columns:
+    # 1. Obter dados via SQL (Filtrado pelo produto para eficiência)
+    base_query, conn = get_filtered_query(company)
+    if not base_query:
         return None
         
-    # Filtra pelo produto
-    df_prod = df[df['produto'] == product_name].copy()
+    try:
+        # Busca apenas colunas necessárias para o produto específico
+        query = f"""
+            SELECT data_filtro, faturamento, contagem_pedidos, produto
+            FROM ({base_query})
+            WHERE produto = '{product_name.replace("'", "''")}'
+        """
+        df_prod = pd.read_sql_query(query, conn)
+    finally:
+        conn.close()
+
+    if df_prod.empty:
+        return None
     
     if df_prod.empty:
         return None

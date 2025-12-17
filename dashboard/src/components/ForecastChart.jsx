@@ -23,18 +23,39 @@ const ForecastChart = ({ data }) => {
         );
     }
 
-    // Prepara dados para garantir continuidade visual
-    // O último ponto histórico deve ser também o primeiro da previsão para a linha não quebrar
-    // Porém, a API retorna lista plana. O Recharts lida bem se tiverem datas compartilhadas ou se for contínuo.
-    // Vamos assumir que a API retorna lista ordenada.
+    // Se houver erro retornado pela API
+    if (data[0] && data[0].error) {
+        return (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 flex flex-col items-center justify-center gap-2">
+                <p className="text-red-500 font-medium">Erro ao gerar previsão</p>
+                <p className="text-gray-400 text-sm">{data[0].error}</p>
+            </div>
+        );
+    }
 
-    const formattedData = data.map(item => ({
-        ...item,
-        // Separa valores para linhas diferentes cores
-        val_history: item.type === 'history' ? item.value : null,
-        val_forecast: item.type === 'forecast' ? item.value : null,
-        // Truque: para o ponto de transição, podemos precisar que ele tenha ambos ou que a previsão comece onde o historico termina.
-    }));
+    // PREPARAÇÃO DOS DADOS
+    // Para criar um gráfico contínuo visualmente, precisamos conectar o último ponto do histórico ao primeiro da previsão.
+    // Estrategia: Adicionar o valor 'val_forecast' também no último ponto de 'history'.
+
+    let lastHistoryIndex = -1;
+    data.forEach((item, index) => {
+        if (item.type === 'history') lastHistoryIndex = index;
+    });
+
+    const chartData = data.map((item, index) => {
+        const isHistory = item.type === 'history';
+        const isForecast = item.type === 'forecast';
+
+        // Se for o último ponto de histórico, ele serve de "âncora" para o início do tracejado vermelho
+        const showAsForecastStart = (index === lastHistoryIndex && lastHistoryIndex !== -1);
+
+        return {
+            ...item,
+            val_history: isHistory ? item.value : null,
+            // A linha de previsão desenha se for forecast OU se for o ponto de conexão
+            val_forecast: (isForecast || showAsForecastStart) ? item.value : null
+        };
+    });
 
     const formatCurrency = (val) => {
         if (val === null || val === undefined) return '';
@@ -42,44 +63,67 @@ const ForecastChart = ({ data }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="mb-6">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Previsão de Demanda (6 Meses)</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Projeção baseada em tendência linear e sazonalidade histórica.
-                </p>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-300">
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        Previsão de Demanda
+                        <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                            IA Beta
+                        </span>
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Projeção para os próximos 6 meses baseada em tendência e sazonalidade.
+                    </p>
+                </div>
             </div>
 
             <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart
-                        data={formattedData}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                        data={chartData}
+                        margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
                     >
+                        <defs>
+                            <linearGradient id="colorHistory" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                            </linearGradient>
+                        </defs>
+
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#374151' : '#E5E7EB'} />
+
                         <XAxis
                             dataKey="date"
                             stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
-                            tick={{ fill: theme === 'dark' ? '#9CA3AF' : '#6B7280' }}
+                            tick={{ fill: theme === 'dark' ? '#9CA3AF' : '#6B7280', fontSize: 12 }}
                             tickMargin={10}
                         />
+
                         <YAxis
                             tickFormatter={(val) => `R$ ${(val / 1000).toFixed(0)}k`}
                             stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
-                            tick={{ fill: theme === 'dark' ? '#9CA3AF' : '#6B7280' }}
+                            tick={{ fill: theme === 'dark' ? '#9CA3AF' : '#6B7280', fontSize: 12 }}
                         />
+
                         <Tooltip
                             contentStyle={{
                                 backgroundColor: theme === 'dark' ? '#1F2937' : '#fff',
                                 borderColor: theme === 'dark' ? '#374151' : '#E5E7EB',
-                                color: theme === 'dark' ? '#fff' : '#000'
+                                borderRadius: '0.5rem',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                color: theme === 'dark' ? '#F3F4F6' : '#111827'
                             }}
-                            formatter={(value, name) => [formatCurrency(value), name === 'val_history' ? 'Histórico' : 'Previsão']}
-                            labelFormatter={(label) => `Mês: ${label}`}
+                            formatter={(value, name) => [
+                                formatCurrency(value),
+                                name === 'val_history' ? 'Histórico' : 'Previsão'
+                            ]}
+                            labelFormatter={(label) => `Período: ${label}`}
                         />
-                        <Legend />
 
-                        {/* Linha Histórica (Sólida) */}
+                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
+
+                        {/* Área para Histórico (Sólida Azul) */}
                         <Area
                             type="monotone"
                             dataKey="val_history"
@@ -88,15 +132,10 @@ const ForecastChart = ({ data }) => {
                             fill="url(#colorHistory)"
                             strokeWidth={3}
                             connectNulls={true}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
                         />
-                        <defs>
-                            <linearGradient id="colorHistory" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
-                                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                            </linearGradient>
-                        </defs>
 
-                        {/* Linha de Previsão (Tracejada) */}
+                        {/* Linha para Previsão (Tracejada Vermelha) */}
                         <Line
                             type="monotone"
                             dataKey="val_forecast"
@@ -104,8 +143,9 @@ const ForecastChart = ({ data }) => {
                             stroke="#dc2626"
                             strokeDasharray="5 5"
                             strokeWidth={3}
-                            dot={{ r: 4, fill: '#dc2626' }}
+                            dot={{ r: 4, fill: '#dc2626', strokeWidth: 2, stroke: '#fff' }}
                             connectNulls={true}
+                            animationDuration={1500}
                         />
                     </ComposedChart>
                 </ResponsiveContainer>

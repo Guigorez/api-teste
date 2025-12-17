@@ -25,6 +25,11 @@ def get_filtered_query(company='animoshop', start_date=None, end_date=None, sour
     Retorna: (query_string, conn)
     """
     company = company.lower()
+    
+    # Fix: Default source to 'limpas' to avoid UNION ALL mismatch between consolidated and atom tables
+    if source is None:
+        source = 'limpas'
+
     try:
         conn = get_db_connection(company)
     except Exception as e:
@@ -128,9 +133,9 @@ def get_resumo_geral(start_date: str = None, end_date: str = None, source: str =
         agg_query = f"""
             SELECT 
                 SUM(faturamento) as faturamento_total,
-                SUM(lucro_liquido) as lucro_liquido_total,
+                SUM(lucro_bruto) as lucro_liquido_total,
                 SUM(CASE WHEN frete IS NOT NULL THEN ABS(frete) ELSE 0 END) as frete_total,
-                SUM(CASE WHEN comissoes IS NOT NULL THEN ABS(comissoes) ELSE 0 END) as comissoes_total,
+                SUM(CASE WHEN "comissões" IS NOT NULL THEN ABS("comissões") ELSE 0 END) as comissoes_total,
                 SUM(contagem_pedidos) as total_pedidos
             FROM ({base_query})
         """
@@ -165,7 +170,7 @@ def get_resumo_geral(start_date: str = None, end_date: str = None, source: str =
                     prev_agg_query = f"""
                         SELECT 
                             SUM(faturamento) as faturamento_total,
-                            SUM(lucro_liquido) as lucro_liquido_total,
+                            SUM(lucro_bruto) as lucro_liquido_total,
                             SUM(contagem_pedidos) as total_pedidos
                         FROM ({prev_query})
                     """
@@ -204,7 +209,7 @@ def get_resumo_marketplace(start_date: str = None, end_date: str = None, source:
         SELECT 
             MarketPlace,
             SUM(faturamento) as faturamento,
-            SUM(lucro_liquido) as lucro_liquido,
+            SUM(lucro_bruto) as lucro_liquido,
             SUM(contagem_pedidos) as contagem_pedidos
         FROM ({base_query})
         GROUP BY MarketPlace
@@ -225,9 +230,9 @@ def get_evolucao_mensal(start_date: str = None, end_date: str = None, source: st
             mes_num_filtro as mes_num,
             mes,
             SUM(faturamento) as faturamento,
-            SUM(lucro_liquido) as lucro_liquido,
+            SUM(lucro_bruto) as lucro_liquido,
             SUM(ABS(frete)) as frete,
-            SUM(ABS(comissoes)) as comissoes
+            SUM(ABS("comissões")) as comissoes
         FROM ({base_query})
         GROUP BY ano, mes_num_filtro, mes
         ORDER BY ano, mes_num_filtro
@@ -283,7 +288,7 @@ def get_evolucao_diaria(start_date: str = None, end_date: str = None, source: st
             mes,
             ano,
             SUM(faturamento) as faturamento,
-            SUM(lucro_liquido) as lucro_liquido,
+            SUM(lucro_bruto) as lucro_liquido,
             SUM(contagem_pedidos) as contagem_pedidos
         FROM ({base_query})
         GROUP BY data_filtro
@@ -300,7 +305,7 @@ def get_evolucao_semanal(start_date: str = None, end_date: str = None, source: s
     base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
     if not base_query: return []
 
-    query = f"SELECT data_filtro, faturamento, lucro_liquido FROM ({base_query})"
+    query = f"SELECT data_filtro, faturamento, lucro_bruto as lucro_liquido FROM ({base_query})"
     df = pd.read_sql_query(query, conn)
     conn.close()
     
@@ -321,7 +326,7 @@ def get_evolucao_anual(start_date: str = None, end_date: str = None, source: str
     if not base_query: return []
     
     query = f"""
-        SELECT ano, SUM(faturamento) as faturamento, SUM(lucro_liquido) as lucro_liquido
+        SELECT ano, SUM(faturamento) as faturamento, SUM(lucro_bruto) as lucro_liquido
         FROM ({base_query})
         GROUP BY ano
         ORDER BY ano
@@ -385,13 +390,17 @@ def get_df_for_ml(company, months=12):
     conn.close()
     return df
 
+from .forecast import generate_forecast
+
 @router.get("/forecast/sales")
 def get_sales_forecast(months: int = 6, company: str = 'animoshop'):
     try:
         return generate_forecast(company, months) 
     except Exception as e:
         logger.error(f"Erro forecast: {e}")
-        return []
+        import traceback
+        traceback.print_exc()
+        return [{"error": str(e), "trace": traceback.format_exc()}]
 
 @router.get("/analysis/clustering")
 def get_product_clustering(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
@@ -403,7 +412,7 @@ def get_product_clustering(start_date: str = None, end_date: str = None, source:
             SELECT 
                 produto,
                 SUM(faturamento) as faturamento,
-                SUM(lucro_liquido) as lucro,
+                SUM(lucro_bruto) as lucro,
                 SUM(contagem_pedidos) as quantidade
             FROM ({base_query})
             GROUP BY produto
