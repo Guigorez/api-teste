@@ -2,12 +2,17 @@ import React from 'react';
 import CostChart from '../components/CostChart';
 import ForecastChart from '../components/ForecastChart';
 
-const Financials = ({ mensal, forecastData, filters }) => {
+const Financials = ({ mensal, forecastData, filters, granularity, onGranularityChange }) => {
     return (
         <div className="space-y-8 animate-fade-in">
             {/* Projeção de Fluxo de Caixa (Topo) */}
             <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl p-1 shadow-sm border border-indigo-100 dark:border-gray-700">
-                <ForecastChart data={forecastData} filters={filters} />
+                <ForecastChart
+                    data={forecastData}
+                    filters={filters}
+                    granularity={granularity}
+                    onGranularityChange={onGranularityChange}
+                />
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">

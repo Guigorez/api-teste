@@ -32,6 +32,8 @@ function App() {
     const [activeTab, setActiveTab] = useState('overview');
     const [topProductsSort, setTopProductsSort] = useState<'faturamento' | 'quantidade'>('faturamento');
 
+    const [forecastGranularity, setForecastGranularity] = useState<'weekly' | 'monthly'>('weekly');
+
     // Merged Filters for Queries
     const queryFilters: Filters = { ...filters, company };
 
@@ -42,6 +44,16 @@ function App() {
         queryKey: ['resumo', queryFilters],
         queryFn: () => getResumo(queryFilters),
         staleTime: 1000 * 60 * 5,
+    });
+
+    // ... (Marketplace/Geo omitted for brevity if unchanged, but I need to be careful not to delete them if I'm replacing block)
+    // Actually I'm replacing a specific block.
+    // I can put the state above `queryFilters`.
+
+    // 3. Inteligência
+    const { data: forecastData } = useQuery({
+        queryKey: ['forecast', queryFilters, forecastGranularity],
+        queryFn: () => getForecast(queryFilters, forecastGranularity, 12)
     });
 
     const { data: marketplaceData } = useQuery({
@@ -67,7 +79,7 @@ function App() {
     });
 
     // 3. Inteligência
-    const { data: forecastData } = useQuery({ queryKey: ['forecast', queryFilters], queryFn: () => getForecast(queryFilters) });
+    // forecastData moved up
     const { data: clusteringData } = useQuery({ queryKey: ['clustering', queryFilters], queryFn: () => getClustering(queryFilters) });
     const { data: bundlesData } = useQuery({ queryKey: ['bundles', queryFilters], queryFn: () => getBundles(queryFilters) });
 
@@ -137,7 +149,15 @@ function App() {
                     />
                 );
             case 'financials':
-                return <Financials mensal={mensal || []} forecastData={forecastData || []} filters={queryFilters} />;
+                return (
+                    <Financials
+                        mensal={mensal || []}
+                        forecastData={forecastData || []}
+                        filters={queryFilters}
+                        granularity={forecastGranularity}
+                        onGranularityChange={setForecastGranularity}
+                    />
+                );
             case 'intelligence':
                 return <Intelligence forecastData={forecastData || []} clusteringData={clusteringData} filters={queryFilters} />;
             case 'opportunities':

@@ -397,9 +397,9 @@ def get_df_for_ml(company, months=12):
 from .forecast import generate_forecast
 
 @router.get("/forecast/sales")
-def get_sales_forecast(months: int = 6, company: str = 'animoshop'):
+def get_sales_forecast(periods: int = 12, granularity: str = 'weekly', company: str = 'animoshop'):
     try:
-        return generate_forecast(company, months) 
+        return generate_forecast(company, periods, granularity) 
     except Exception as e:
         logger.error(f"Erro forecast: {e}")
         import traceback

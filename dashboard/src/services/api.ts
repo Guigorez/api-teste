@@ -63,8 +63,11 @@ export const getTopProdutos = async (limit: number = 10, filters?: Filters, sort
     return response.data;
 };
 
-export const getForecast = async (filters?: Filters): Promise<any> => {
-    const response = await api.get('/forecast/sales', getParams(filters));
+export const getForecast = async (filters?: Filters, granularity: 'weekly' | 'monthly' = 'weekly', periods: number = 12): Promise<any> => {
+    const { params } = getParams(filters);
+    params.granularity = granularity;
+    params.periods = periods;
+    const response = await api.get('/forecast/sales', { params });
     return response.data;
 };
 
