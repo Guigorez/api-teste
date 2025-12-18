@@ -9,7 +9,8 @@ import {
     ResponsiveContainer,
     ReferenceLine,
     Legend,
-    Cell
+    Cell,
+    ZAxis
 } from 'recharts';
 import { useTheme } from '../context/ThemeContext';
 
@@ -40,6 +41,7 @@ const ClusterChart = ({ data }) => {
                     <p>Cluster: <span style={{ color: data.color, fontWeight: 'bold' }}>{data.cluster}</span></p>
                     <p>Faturamento: {formatCurrency(data.revenue)}</p>
                     <p>Lucro: {formatCurrency(data.profit)}</p>
+                    <p>Volume: {data.volume} un.</p>
                 </div>
             );
         }
@@ -77,6 +79,12 @@ const ClusterChart = ({ data }) => {
                             tickFormatter={(val) => `R$${(val / 1000).toFixed(0)}k`}
                             stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
                             label={{ value: 'Faturamento', angle: -90, position: 'insideLeft', fill: theme === 'dark' ? '#9CA3AF' : '#6B7280' }}
+                        />
+                        <ZAxis
+                            type="number"
+                            dataKey="volume"
+                            range={[60, 600]}
+                            name="Volume (Qtd)"
                         />
 
                         <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />

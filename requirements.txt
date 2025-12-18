@@ -7,3 +7,4 @@ mlxtend
 openpyxl
 python-multipart
 xlsxwriter
+statsmodels

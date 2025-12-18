@@ -56,6 +56,14 @@ const ElasticityChart = ({ filters }) => {
             setLoading(true);
             try {
                 const result = await getElasticity(selectedProduct);
+                if (result && result.chart_data) {
+                    // Prepara dados para Area Chart com Range [min, max]
+                    result.chart_data = result.chart_data.map(item => ({
+                        ...item,
+                        revenue_range: [item.projected_revenue_lower, item.projected_revenue_upper],
+                        demand_range: [item.demand_qty_lower, item.demand_qty_upper]
+                    }));
+                }
                 setData(result);
             } catch (error) {
                 console.error("Erro elasticidade:", error);
@@ -167,16 +175,26 @@ const ElasticityChart = ({ filters }) => {
                                     dot={false}
                                 />
 
-                                {/* Curva de Receita (Verde - Area) */}
+                                {/* Faixa de Confiança da Receita (Verde Transparente) */}
                                 <Area
+                                    yAxisId="right"
+                                    type="monotone"
+                                    dataKey="revenue_range"
+                                    name="Intervalo de Confiança (Receita)"
+                                    stroke="none"
+                                    fill="#10B981"
+                                    fillOpacity={0.15}
+                                />
+
+                                {/* Linha Principal de Receita (Verde Sólido) */}
+                                <Line
                                     yAxisId="right"
                                     type="monotone"
                                     dataKey="projected_revenue"
                                     name="Receita Projetada"
-                                    fill="#10B981"
-                                    fillOpacity={0.2}
                                     stroke="#10B981"
-                                    strokeWidth={2}
+                                    strokeWidth={3}
+                                    dot={false}
                                 />
 
                                 <ReferenceLine x={data.current_avg_price} stroke="#3B82F6" strokeDasharray="3 3" label="Preço Atual" />
@@ -191,7 +209,7 @@ const ElasticityChart = ({ filters }) => {
             ) : (
                 <div className="h-64 flex flex-col items-center justify-center text-center p-6 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
                     <p className="text-gray-500 mb-2">
-                        {!products.length ? "Nenhum produto encontrado para análise." : "Não foi possível calcular a elasticidade para este produto."}
+                        {data && data.message ? data.message : (!products.length ? "Nenhum produto encontrado para análise." : "Não foi possível calcular a elasticidade para este produto.")}
                     </p>
                     <p className="text-xs text-gray-400">
                         debug: {JSON.stringify(filters)} <br />

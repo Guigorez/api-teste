@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import shutil
 from marketplace_base_as import MarketplaceBase
 
 class AmazonProcessor(MarketplaceBase):
@@ -33,6 +34,78 @@ class AmazonProcessor(MarketplaceBase):
             '7': 'Julho', '07': 'Julho', '8': 'Agosto', '08': 'Agosto',
             '9': 'Setembro', '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
         }
+        
+        # Performance: Controle de arquivos processados
+        self.files_to_move = []
+        self.processed_dir = os.path.join(self.input_folder, 'Processados')
+        if not os.path.exists(self.processed_dir):
+            try:
+                os.makedirs(self.processed_dir)
+            except Exception as e:
+                print(f"Erro ao criar pasta Processados: {e}")
+                self.processed_dir = None # Disable feature on error
+
+    def load_data(self):
+        print("="*80)
+        print(f"PROCESSANDO CONSOLIDAÇÃO {self.marketplace_name.upper()} (Otimizado)...")
+        
+        if not os.path.exists(self.input_folder):
+            print(f"❌ Pasta de entrada não encontrada: {self.input_folder}")
+            return
+
+        # Lista apenas arquivos na raiz (ignora pastas como Processados)
+        arquivos = [f for f in os.listdir(self.input_folder) 
+                   if os.path.isfile(os.path.join(self.input_folder, f)) 
+                   and f.endswith(('.csv', '.xlsx', '.xls'))]
+        
+        print(f"Encontrados {len(arquivos)} arquivos para processar.")
+        
+        for file in arquivos:
+            caminho = os.path.join(self.input_folder, file)
+            try:
+                df = self._read_file(caminho)
+                if df is not None and not df.empty:
+                    # Padroniza colunas
+                    df.columns = df.columns.str.strip()
+                    self.dfs.append(df)
+                    self.files_to_move.append(file) # Marca para mover no final
+                    print(f" -> Lido com sucesso: {file}")
+                else:
+                    print(f" -> Arquivo vazio ou ilegível (ignorado): {file}")
+            except Exception as e:
+                print(f"❌ ERRO CRÍTICO ao ler {file}: {e}")
+                # Não adiciona a files_to_move, então não será movido
+
+        if not self.dfs:
+            print("❌ Nenhum arquivo novo processado.")
+        else:
+            self.df_final = pd.concat(self.dfs, ignore_index=True)
+
+    def move_processed_files(self):
+        """Move arquivos processados com sucesso para a pasta Processados"""
+        if not self.files_to_move or not self.processed_dir:
+            return
+
+        print("\n" + "-"*40)
+        print("Movendo arquivos processados...")
+        count = 0
+        for file in self.files_to_move:
+            src = os.path.join(self.input_folder, file)
+            dst = os.path.join(self.processed_dir, file)
+            
+            try:
+                if os.path.exists(dst):
+                    # Se já existe, renomeia com timestamp ou sobrescreve?
+                    # Para simplificar: Remove destino antigo e move novo
+                    os.remove(dst)
+                
+                shutil.move(src, dst)
+                count += 1
+            except Exception as e:
+                print(f"Erro ao mover {file}: {e}")
+        
+        print(f"Arquivos movidos: {count}/{len(self.files_to_move)}")
+        self.files_to_move = [] # Limpa lista
 
     def _read_file(self, file_path):
         # Amazon tem skiprows=7
@@ -131,6 +204,9 @@ class AmazonProcessor(MarketplaceBase):
 
         self.save_and_segregate()
         self.print_summary()
+        
+        # Finaliza movendo arquivos
+        self.move_processed_files()
 
 def processar_amazon():
     processor = AmazonProcessor()

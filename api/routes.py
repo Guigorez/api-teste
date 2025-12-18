@@ -102,19 +102,22 @@ def get_filtered_query(company='animoshop', start_date=None, end_date=None, sour
     base_query = f"WITH all_sales AS ({union_query}) SELECT * FROM all_sales WHERE 1=1"
     
     # 3. Aplica Filtros (WHERE)
-    params = []
+    params = {}
     where_clauses = ""
     
     if marketplace:
         # Case insensitive query
-        where_clauses += f" AND LOWER(MarketPlace) = LOWER('{marketplace}')"
+        where_clauses += " AND LOWER(MarketPlace) = LOWER(:marketplace)"
+        params['marketplace'] = marketplace
         
     if start_date and end_date:
         # Filtro de data otimizado
-        where_clauses += f" AND data_filtro BETWEEN '{start_date}' AND '{end_date}'"
+        where_clauses += " AND data_filtro BETWEEN :start_date AND :end_date"
+        params['start_date'] = start_date
+        params['end_date'] = end_date
         
     final_query = base_query + where_clauses
-    return final_query, conn
+    return final_query, params, conn
 
 
 # --- ENDPOINTS REFACTORADOS PARA SQL ---
@@ -125,7 +128,7 @@ def get_resumo_geral(start_date: str = None, end_date: str = None, source: str =
         from datetime import datetime, timedelta
 
         # 1. Query Principal
-        base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+        base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
         if not base_query:
              return {"faturamento_total": 0, "comparisons": {}}
 
@@ -140,7 +143,7 @@ def get_resumo_geral(start_date: str = None, end_date: str = None, source: str =
             FROM ({base_query})
         """
         
-        df_agg = pd.read_sql_query(agg_query, conn)
+        df_agg = pd.read_sql_query(agg_query, conn, params=params)
         
         curr_metrics = df_agg.iloc[0].to_dict()
         # Tratamento de NULL
@@ -165,7 +168,7 @@ def get_resumo_geral(start_date: str = None, end_date: str = None, source: str =
                 p_start = prev_start.strftime(fmt)
                 p_end = prev_end.strftime(fmt)
                 
-                prev_query, _ = get_filtered_query(company, p_start, p_end, source, marketplace)
+                prev_query, prev_params, _ = get_filtered_query(company, p_start, p_end, source, marketplace)
                 if prev_query:
                     prev_agg_query = f"""
                         SELECT 
@@ -174,7 +177,7 @@ def get_resumo_geral(start_date: str = None, end_date: str = None, source: str =
                             SUM(contagem_pedidos) as total_pedidos
                         FROM ({prev_query})
                     """
-                    df_prev = pd.read_sql_query(prev_agg_query, conn)
+                    df_prev = pd.read_sql_query(prev_agg_query, conn, params=prev_params)
                     prev_metrics = df_prev.iloc[0].to_dict()
                     
                     # Helper %
@@ -202,7 +205,7 @@ def get_resumo_geral(start_date: str = None, end_date: str = None, source: str =
 
 @router.get("/marketplace")
 def get_resumo_marketplace(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
-    base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+    base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
     if not base_query: return []
     
     query = f"""
@@ -214,13 +217,13 @@ def get_resumo_marketplace(start_date: str = None, end_date: str = None, source:
         FROM ({base_query})
         GROUP BY MarketPlace
     """
-    df = pd.read_sql_query(query, conn)
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df.to_dict(orient='records')
 
 @router.get("/mensal")
 def get_evolucao_mensal(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
-    base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+    base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
     if not base_query: return []
     
     # Agrupa por Ano, MesNum (Ordenação) e Mes (Nome)
@@ -237,20 +240,20 @@ def get_evolucao_mensal(start_date: str = None, end_date: str = None, source: st
         GROUP BY ano, mes_num_filtro, mes
         ORDER BY ano, mes_num_filtro
     """
-    df = pd.read_sql_query(query, conn)
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df.to_dict(orient='records')
 
 @router.get("/pagamentos")
 def get_metodos_pagamento(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
-    base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+    base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
     if not base_query: return []
     
     possible_cols = ['metodo_de_pagamento', 'forma_pagamento', 'payment_method']
     col_found = 'metodo_de_pagamento' # Fallback default
     
     try:
-        sample = pd.read_sql_query(f"SELECT * FROM ({base_query}) LIMIT 1", conn)
+        sample = pd.read_sql_query(f"SELECT * FROM ({base_query}) LIMIT 1", conn, params=params)
         for cand in possible_cols:
             if cand in sample.columns:
                 col_found = cand
@@ -268,7 +271,7 @@ def get_metodos_pagamento(start_date: str = None, end_date: str = None, source: 
         ORDER BY faturamento DESC
     """
     try:
-        df = pd.read_sql_query(query, conn)
+        df = pd.read_sql_query(query, conn, params=params)
         conn.close()
         return df.to_dict(orient='records')
     except Exception as e:
@@ -278,7 +281,7 @@ def get_metodos_pagamento(start_date: str = None, end_date: str = None, source: 
 
 @router.get("/diario")
 def get_evolucao_diaria(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
-    base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+    base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
     if not base_query: return []
 
     query = f"""
@@ -294,7 +297,7 @@ def get_evolucao_diaria(start_date: str = None, end_date: str = None, source: st
         GROUP BY data_filtro
         ORDER BY data_filtro
     """
-    df = pd.read_sql_query(query, conn)
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     if not df.empty and 'data_filtro' in df.columns:
         df['data_iso'] = pd.to_datetime(df['data_filtro']).dt.strftime('%Y-%m-%d')
@@ -302,11 +305,11 @@ def get_evolucao_diaria(start_date: str = None, end_date: str = None, source: st
 
 @router.get("/semanal")
 def get_evolucao_semanal(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
-    base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+    base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
     if not base_query: return []
 
     query = f"SELECT data_filtro, faturamento, lucro_bruto as lucro_liquido FROM ({base_query})"
-    df = pd.read_sql_query(query, conn)
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     
     if df.empty: return []
@@ -322,7 +325,7 @@ def get_evolucao_semanal(start_date: str = None, end_date: str = None, source: s
 
 @router.get("/anual")
 def get_evolucao_anual(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
-    base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+    base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
     if not base_query: return []
     
     query = f"""
@@ -331,13 +334,13 @@ def get_evolucao_anual(start_date: str = None, end_date: str = None, source: str
         GROUP BY ano
         ORDER BY ano
     """
-    df = pd.read_sql_query(query, conn)
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df.to_dict(orient='records')
 
 @router.get("/produtos/top")
 def get_top_produtos(limit: int = 10, start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, sort_by: str = 'faturamento', company: str = 'animoshop'):
-    base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+    base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
     if not base_query: return []
     
     order_col = 'faturamento' if sort_by == 'faturamento' else 'contagem_pedidos'
@@ -352,13 +355,13 @@ def get_top_produtos(limit: int = 10, start_date: str = None, end_date: str = No
         ORDER BY {order_col} DESC
         LIMIT {limit}
     """
-    df = pd.read_sql_query(query, conn)
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df.to_dict(orient='records')
 
 @router.get("/geo")
 def get_vendas_geo(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
-    base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+    base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
     if not base_query: return []
     
     query = f"""
@@ -371,7 +374,7 @@ def get_vendas_geo(start_date: str = None, end_date: str = None, source: str = N
         WHERE length(uf_norm) = 2
         GROUP BY uf_norm
     """
-    df = pd.read_sql_query(query, conn)
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     
     if not df.empty:
@@ -384,9 +387,9 @@ def get_vendas_geo(start_date: str = None, end_date: str = None, source: str = N
 # --- OUTROS ENDPOINTS (AI) ---
 
 def get_df_for_ml(company, months=12):
-    base_query, conn = get_filtered_query(company) # Traz tudo
+    base_query, params, conn = get_filtered_query(company) # Traz tudo
     if not base_query: return pd.DataFrame()
-    df = pd.read_sql_query(base_query, conn)
+    df = pd.read_sql_query(base_query, conn, params=params)
     conn.close()
     return df
 
@@ -405,7 +408,7 @@ def get_sales_forecast(months: int = 6, company: str = 'animoshop'):
 @router.get("/analysis/clustering")
 def get_product_clustering(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
     try:
-        base_query, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
+        base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
         if not base_query: return []
         
         query = f"""
@@ -417,7 +420,7 @@ def get_product_clustering(start_date: str = None, end_date: str = None, source:
             FROM ({base_query})
             GROUP BY produto
         """
-        df = pd.read_sql_query(query, conn)
+        df = pd.read_sql_query(query, conn, params=params)
         conn.close()
         
         from .clustering import perform_clustering_from_df

@@ -11,11 +11,11 @@ def calculate_bundles(company='animoshop', min_lift=1.1, min_confidence=0.3):
 
     
     # 1. Obter dados
-    base_query, conn = get_filtered_query(company)
+    base_query, params, conn = get_filtered_query(company)
     if not base_query: return []
     
     query = f"SELECT * FROM ({base_query})"
-    df = pd.read_sql_query(query, conn)
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     
     if df.empty or 'produto' not in df.columns:

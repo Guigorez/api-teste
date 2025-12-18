@@ -73,6 +73,7 @@ def perform_clustering_from_df(product_stats):
             "product": row['produto'],
             "revenue": row['faturamento'],
             "profit": row['lucro_liquido'],
+            "volume": int(row['quantidade']) if 'quantidade' in row else 0,
             "cluster": cluster_info['label'],
             "color": cluster_info['color']
         })
