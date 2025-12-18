@@ -137,7 +137,7 @@ function App() {
                     />
                 );
             case 'financials':
-                return <Financials mensal={mensal || []} />;
+                return <Financials mensal={mensal || []} forecastData={forecastData || []} filters={queryFilters} />;
             case 'intelligence':
                 return <Intelligence forecastData={forecastData || []} clusteringData={clusteringData} filters={queryFilters} />;
             case 'opportunities':

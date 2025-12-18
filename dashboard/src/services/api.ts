@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Filters, SummaryData, MonthlyData, TopProduct, GeoData, MarketplaceData } from '../types';
+import { Filters, SummaryData, MonthlyData, TopProduct, GeoData, MarketplaceData, RiskData } from '../types';
 
 const api = axios.create({
     baseURL: '/api', // Uses Vite Proxy
@@ -78,12 +78,21 @@ export const getBundles = async (filters?: Filters): Promise<any> => {
     return response.data;
 };
 
-export const getElasticity = async (productName: string): Promise<any> => {
-    const response = await api.get('/analysis/elasticity', { params: { product_name: productName } });
+export const getElasticity = async (productName: string, filters?: Filters): Promise<any> => {
+    const { params } = getParams(filters);
+    const mergedParams = { ...params, product_name: productName };
+    const response = await api.get('/analysis/elasticity', { params: mergedParams });
     return response.data;
 };
 
 export const processData = async (company: 'animoshop' | 'novoon' = 'animoshop'): Promise<any> => {
     const response = await api.post('/processar', null, { params: { company } });
+    return response.data;
+};
+
+export const getRiskAnalysis = async (filters?: Filters): Promise<RiskData> => {
+    // Risk endpoint ignores date filters usually (uses full history or internal logic), 
+    // but we pass company param at least. UPDATE: Now it accepts all filters!
+    const response = await api.get<RiskData>('/analysis/risk-analysis', getParams(filters));
     return response.data;
 };

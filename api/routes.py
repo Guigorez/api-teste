@@ -4,6 +4,7 @@ from .forecast import generate_forecast
 from .clustering import perform_clustering
 from .elasticity import calculate_elasticity
 from .bundles import calculate_bundles
+from .risk import calculate_market_risk
 import pandas as pd
 import threading
 import time
@@ -440,8 +441,16 @@ def get_bundle_suggestions(min_lift: float = 1.1, min_confidence: float = 0.3, c
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analysis/elasticity")
-def get_price_elasticity(product_name: str, company: str = 'animoshop'):
-    return calculate_elasticity(product_name, company)
+def get_price_elasticity(product_name: str, start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
+    return calculate_elasticity(product_name, company, start_date, end_date, source, marketplace)
+
+@router.get("/analysis/risk-analysis")
+def get_risk_analysis(start_date: str = None, end_date: str = None, source: str = None, marketplace: str = None, company: str = 'animoshop'):
+    try:
+        return calculate_market_risk(company, start_date, end_date, source, marketplace)
+    except Exception as e:
+        logger.error(f"Erro risk-analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- ETL ---
 

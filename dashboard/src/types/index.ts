@@ -51,3 +51,24 @@ export interface MarketplaceData {
     lucro_liquido: number;
     contagem_pedidos: number;
 }
+
+export interface RiskData {
+    company: string;
+    metrics: {
+        hhi_score: number;
+        risk_level: string;
+        risk_color: string;
+        risk_description: string;
+        total_revenue: number;
+    };
+    simulation: {
+        scenario: string;
+        revenue_at_risk: number;
+        impact_description: string;
+    };
+    distribution: {
+        marketplace: string;
+        revenue: number;
+        share_percentage: number;
+    }[];
+}

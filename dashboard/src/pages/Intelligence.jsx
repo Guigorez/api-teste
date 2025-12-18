@@ -3,10 +3,14 @@ import React from 'react';
 
 import ClusterChart from '../components/ClusterChart';
 import ElasticityChart from '../components/ElasticityChart';
+import RiskAnalysis from '../components/RiskAnalysis';
 
 const Intelligence = ({ forecastData, clusteringData, filters }) => {
     return (
         <div className="space-y-8 animate-fade-in">
+            {/* Seção 1: Risco de Mercado (Novo) */}
+            <RiskAnalysis filters={filters} />
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Seção 2: Clusterização */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">

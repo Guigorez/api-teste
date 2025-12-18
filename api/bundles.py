@@ -14,62 +14,38 @@ def calculate_bundles(company='animoshop', min_lift=1.1, min_confidence=0.3):
     base_query, params, conn = get_filtered_query(company)
     if not base_query: return []
     
-    query = f"SELECT * FROM ({base_query})"
+    # Busca apenas colunas necessárias para minimizar tráfego e uso de memória
+    query = f"""
+        SELECT produto, id_do_pedido_unificado
+        FROM ({base_query})
+        WHERE id_do_pedido_unificado IS NOT NULL 
+          AND id_do_pedido_unificado != ''
+    """
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     
     if df.empty or 'produto' not in df.columns:
         return []
 
-    # Criar ID de Transação Artificial (Marketplace + Data + Hora/Minuto)
-    # Se não tiver hora, usa Data. Se tiver Hora, arredonda.
+    # 2. Agrupa Transações por ID Real
+    # Agrupa produtos por pedido (Cesta de Compras)
+    transactions = df.groupby(['id_do_pedido_unificado'])['produto'].apply(list).tolist()
     
-    # Garante conversão de data
-    if 'data_filtro' not in df.columns:
-        # Tenta criar se não existir (muito improvável dado o ETL)
-        pass 
-        
-    df['txn_id'] = df['marketplace'].astype(str) + "_" + df['data_filtro'].astype(str)
-    
-    # Se tiver hora, refina
-    # (Assumindo que talvez não tenhamos hora estruturada em todas as tabelas, vamos usar o que der)
-    # Para simplificar e garantir funcionamento, vamos agrupar por DIA por enquanto, 
-    # pois "Hora" exata pode não estar limpa em todos os marketplaces consolidados.
-    # O ideal seria 'pedido_id', mas o prompt diz que não temos customer ID ou ID unificado confiável.
-    # Agrupar por dia pode gerar "cestas" muito grandes (todas vendas do dia), o que pode distorcer.
-    # Vamos tentar usar uma coluna de 'hora' se existir, ou 'Numero Pedido' se existir (mas user disse que não confia).
-    # O prompt sugere: "Marketplace + Data + Hora (arredonde para minuto)".
-    
-    time_col = None
-    for col in ['Hora', 'hora', 'Horario', 'time']:
-        if col in df.columns:
-            time_col = col
-            break
-            
-    if time_col:
-        # Tenta limpar a hora Para HH:MM
-        # Assumindo string HH:MM:SS
-        df['txn_time'] = df[time_col].astype(str).str.slice(0, 5) # HH:MM
-        df['txn_id'] = df['txn_id'] + "_" + df['txn_time']
-    
-    # 2. Agrupa Transações
-    # List of lists for transaction encoder
-    transactions = df.groupby(['txn_id'])['produto'].apply(list).tolist()
-    
-    # Filtra transações com < 2 itens (não gera regra)
+    # Filtra transações com < 2 itens (não gera regra, pois precisamos de par para associar)
     transactions = [t for t in transactions if len(t) >= 2]
     
-    if len(transactions) < 10:
-        return [] # Poucas transações multi-item para analise
+    # Validação mínima de volume
+    if len(transactions) < 5:
+        return [] # Sem dados suficientes para análise estatística
         
     # 3. One-Hot Encoding
     te = TransactionEncoder()
     te_ary = te.fit(transactions).transform(transactions)
     df_trans = pd.DataFrame(te_ary, columns=te.columns_)
     
-    # 4. Frequent Itemsets (FPGrowth é mais rápido que Apriori)
-    # min_support: produto deve aparecer em pelo menos 0.5% das cestas (ajustável)
-    frequent_itemsets = fpgrowth(df_trans, min_support=0.005, use_colnames=True)
+    # 4. Frequent Itemsets (FPGrowth)
+    # min_support=0.01 (1%) -> Filtra ruído e foca em padrões recorrentes reais
+    frequent_itemsets = fpgrowth(df_trans, min_support=0.01, use_colnames=True)
     
     if frequent_itemsets.empty:
         return []

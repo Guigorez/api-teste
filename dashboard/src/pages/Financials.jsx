@@ -1,9 +1,15 @@
 import React from 'react';
 import CostChart from '../components/CostChart';
+import ForecastChart from '../components/ForecastChart';
 
-const Financials = ({ mensal }) => {
+const Financials = ({ mensal, forecastData, filters }) => {
     return (
         <div className="space-y-8 animate-fade-in">
+            {/* Projeção de Fluxo de Caixa (Topo) */}
+            <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl p-1 shadow-sm border border-indigo-100 dark:border-gray-700">
+                <ForecastChart data={forecastData} filters={filters} />
+            </div>
+
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                 <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Análise de Custos & Lucratividade</h3>
                 <p className="text-sm text-gray-500 mb-6">Detalhamento mensal de Receita vs Custos (Produtos + Taxas + Impostos).</p>

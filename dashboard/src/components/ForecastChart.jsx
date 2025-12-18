@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { useTheme } from '../context/ThemeContext';
 
-const ForecastChart = ({ data }) => {
+const ForecastChart = ({ data, filters }) => {
     const { theme } = useTheme();
 
     if (!data || data.length === 0) {
@@ -23,7 +23,6 @@ const ForecastChart = ({ data }) => {
         );
     }
 
-    // Se houver erro retornado pela API
     if (data[0] && data[0].error) {
         return (
             <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 flex flex-col items-center justify-center gap-2">
@@ -33,27 +32,44 @@ const ForecastChart = ({ data }) => {
         );
     }
 
-    // PREPARAÇÃO DOS DADOS
-    // Para criar um gráfico contínuo visualmente, precisamos conectar o último ponto do histórico ao primeiro da previsão.
-    // Estrategia: Adicionar o valor 'val_forecast' também no último ponto de 'history'.
-
+    // --- PROCESSAMENTO DE DADOS ---
+    // 1. Identificar o índice de transição
     let lastHistoryIndex = -1;
     data.forEach((item, index) => {
         if (item.type === 'history') lastHistoryIndex = index;
     });
 
+    // 2. Mapear dados para o Recharts
     const chartData = data.map((item, index) => {
         const isHistory = item.type === 'history';
-        const isForecast = item.type === 'forecast';
+        const isTransition = index === lastHistoryIndex;
 
-        // Se for o último ponto de histórico, ele serve de "âncora" para o início do tracejado vermelho
-        const showAsForecastStart = (index === lastHistoryIndex && lastHistoryIndex !== -1);
+        // Histórico puro
+        let val_history = isHistory ? item.revenue_real : null;
+
+        // Previsão (Ancorada no último histórico)
+        let val_forecast = null;
+        if (item.type === 'forecast') {
+            val_forecast = item.revenue_forecast;
+        } else if (isTransition) {
+            val_forecast = item.revenue_real;
+        }
+
+        // Faixa de Incerteza [min, max]
+        let range = null;
+        if (item.type === 'forecast') {
+            range = [item.revenue_lower, item.revenue_upper];
+        } else if (isTransition) {
+            // No ponto zero, a incerteza é zero (ou mínima)
+            range = [item.revenue_real, item.revenue_real];
+        }
 
         return {
-            ...item,
-            val_history: isHistory ? item.value : null,
-            // A linha de previsão desenha se for forecast OU se for o ponto de conexão
-            val_forecast: (isForecast || showAsForecastStart) ? item.value : null
+            date: item.date,
+            val_history,
+            val_forecast,
+            range,
+            _original: item
         };
     });
 
@@ -62,18 +78,58 @@ const ForecastChart = ({ data }) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
     };
 
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (active && payload && payload.length) {
+            const point = payload[0].payload;
+            const isForecast = point.range !== null;
+            const value = isForecast ? point.val_forecast : point.val_history;
+            const originalDate = new Date(point.date).toLocaleDateString('pt-BR');
+
+            return (
+                <div className={`p-4 border rounded-xl shadow-xl backdrop-blur-sm ${theme === 'dark' ? 'bg-gray-800/90 border-gray-700 text-gray-200' : 'bg-white/90 border-gray-200 text-gray-800'}`}>
+                    <p className="font-bold mb-3 text-sm border-b pb-2 border-gray-100 dark:border-gray-700">{originalDate}</p>
+
+                    {isForecast ? (
+                        <>
+                            <div className="mb-2">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Projeção Central</p>
+                                <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(value)}</p>
+                            </div>
+                            <div className="flex gap-4 text-xs bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg">
+                                <div>
+                                    <p className="text-gray-400">Pessimista (Mín)</p>
+                                    <p className="font-semibold text-gray-700 dark:text-gray-300">{formatCurrency(point.range[0])}</p>
+                                </div>
+                                <div className="border-l pl-4 border-gray-200 dark:border-gray-700">
+                                    <p className="text-gray-400">Otimista (Máx)</p>
+                                    <p className="font-semibold text-gray-700 dark:text-gray-300">{formatCurrency(point.range[1])}</p>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Faturamento Real</p>
+                            <p className="text-lg font-bold text-green-700 dark:text-green-500">{formatCurrency(value)}</p>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        return null;
+    };
+
     return (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-300">
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex justify-between items-end">
                 <div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        Previsão de Demanda
-                        <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                            IA Beta
+                        Projeção de Fluxo de Receita
+                        <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800">
+                            12 Semanas
                         </span>
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        Projeção para os próximos 6 meses baseada em tendência e sazonalidade.
+                        Previsão estatística de receita com margem de segurança.
                     </p>
                 </div>
             </div>
@@ -85,9 +141,9 @@ const ForecastChart = ({ data }) => {
                         margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
                     >
                         <defs>
-                            <linearGradient id="colorHistory" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
-                                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                            <linearGradient id="colorRange" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10B981" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="#10B981" stopOpacity={0.05} />
                             </linearGradient>
                         </defs>
 
@@ -96,56 +152,53 @@ const ForecastChart = ({ data }) => {
                         <XAxis
                             dataKey="date"
                             stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
-                            tick={{ fill: theme === 'dark' ? '#9CA3AF' : '#6B7280', fontSize: 12 }}
-                            tickMargin={10}
+                            tick={{ fontSize: 11 }}
+                            tickFormatter={(val) => {
+                                const d = new Date(val);
+                                return `${d.getDate()}/${d.getMonth() + 1}`;
+                            }}
+                            minTickGap={30}
                         />
 
                         <YAxis
                             tickFormatter={(val) => `R$ ${(val / 1000).toFixed(0)}k`}
                             stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
-                            tick={{ fill: theme === 'dark' ? '#9CA3AF' : '#6B7280', fontSize: 12 }}
+                            tick={{ fontSize: 11 }}
                         />
 
-                        <Tooltip
-                            contentStyle={{
-                                backgroundColor: theme === 'dark' ? '#1F2937' : '#fff',
-                                borderColor: theme === 'dark' ? '#374151' : '#E5E7EB',
-                                borderRadius: '0.5rem',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                color: theme === 'dark' ? '#F3F4F6' : '#111827'
-                            }}
-                            formatter={(value, name) => [
-                                formatCurrency(value),
-                                name === 'val_history' ? 'Histórico' : 'Previsão'
-                            ]}
-                            labelFormatter={(label) => `Período: ${label}`}
-                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
 
-                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
-
-                        {/* Área para Histórico (Sólida Azul) */}
+                        {/* Área de Incerteza */}
                         <Area
                             type="monotone"
-                            dataKey="val_history"
-                            name="Histórico"
-                            stroke="#2563eb"
-                            fill="url(#colorHistory)"
-                            strokeWidth={3}
+                            dataKey="range"
+                            name="Margem de Erro"
+                            stroke="none"
+                            fill="url(#colorRange)"
                             connectNulls={true}
-                            activeDot={{ r: 6, strokeWidth: 0 }}
                         />
 
-                        {/* Linha para Previsão (Tracejada Vermelha) */}
+                        {/* Histórico - Verde Forte Sólido */}
+                        <Line
+                            type="monotone"
+                            dataKey="val_history"
+                            name="Realizado"
+                            stroke="#059669" // emerald-600
+                            strokeWidth={3}
+                            dot={{ r: 3, fill: '#059669' }}
+                            activeDot={{ r: 6 }}
+                        />
+
+                        {/* Previsão - Verde Médio Pontilhado */}
                         <Line
                             type="monotone"
                             dataKey="val_forecast"
-                            name="Previsão"
-                            stroke="#dc2626"
-                            strokeDasharray="5 5"
+                            name="Projeção"
+                            stroke="#10B981" // emerald-500
                             strokeWidth={3}
-                            dot={{ r: 4, fill: '#dc2626', strokeWidth: 2, stroke: '#fff' }}
-                            connectNulls={true}
-                            animationDuration={1500}
+                            strokeDasharray="5 5"
+                            dot={{ r: 3, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
                         />
                     </ComposedChart>
                 </ResponsiveContainer>

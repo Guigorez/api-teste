@@ -6,7 +6,7 @@ import logging
 # Configuração de Logger
 logger = logging.getLogger(__name__)
 
-def calculate_elasticity(product_name: str, company='animoshop'):
+def calculate_elasticity(product_name: str, company='animoshop', start_date=None, end_date=None, source=None, marketplace=None):
     """
     Calcula a Elasticidade-Preço da Demanda usando Modelo Log-Log.
     Ln(Q) = alpha + beta * Ln(P)
@@ -21,7 +21,7 @@ def calculate_elasticity(product_name: str, company='animoshop'):
         from .routes import get_filtered_query
         
         # 1. OBTER DADOS
-        base_query, params, conn = get_filtered_query(company)
+        base_query, params, conn = get_filtered_query(company, start_date, end_date, source, marketplace)
         if not base_query:
             return None
             
@@ -90,12 +90,12 @@ def calculate_elasticity(product_name: str, company='animoshop'):
         r_squared = model.rsquared
         
         # Validação R2
+        warning_msg = None
         if r_squared < 0.3:
-            return {
-                "status": "inconclusive",
-                "message": f"Baixa correlação detectada (R² = {r_squared:.2f}). O preço não parece explicar a demanda.",
-                "r_squared": r_squared
-            }
+            warning_msg = f"Baixa correlação (R²={r_squared:.2f}). O resultado pode não ser confiável devido à alta volatilidade ou pouca variação de preço."
+            logger.warning(f"Elasticidade {product_name}: {warning_msg}")
+
+        # [REMOVIDO BLOQUEIO DE R2 < 0.3] - Segue para gerar o gráfico mesmo assim
             
         # 5. GERAR DADOS PARA GRÁFICO (COM INTERVALO DE CONFIANÇA)
         curr_price = grp['preco_unitario'].mean()
@@ -159,7 +159,8 @@ def calculate_elasticity(product_name: str, company='animoshop'):
             "elasticity_status": elasticity_label,
             "r_squared": round(r_squared, 4),
             "optimal_price_suggestion": opt_price_sim,
-            "chart_data": chart_data
+            "chart_data": chart_data,
+            "warning": warning_msg
         }
         
         logger.info(f"Elasticidade calculada para {product_name}: E={elasticity:.2f}, R2={r_squared:.2f}")

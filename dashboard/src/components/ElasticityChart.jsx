@@ -55,7 +55,7 @@ const ElasticityChart = ({ filters }) => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const result = await getElasticity(selectedProduct);
+                const result = await getElasticity(selectedProduct, filters);
                 if (result && result.chart_data) {
                     // Prepara dados para Area Chart com Range [min, max]
                     result.chart_data = result.chart_data.map(item => ({
@@ -73,7 +73,7 @@ const ElasticityChart = ({ filters }) => {
             }
         };
         fetchData();
-    }, [selectedProduct]);
+    }, [selectedProduct, filters]);
 
     const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
