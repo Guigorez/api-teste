@@ -10,7 +10,7 @@ import magalu_nv as magalu
 import madeira_madeira_nv as madeira_madeira
 import olist_nv as olist
 import atom_nv as atom            # Seu script de conciliação
-import criar_banco_sql_nv as criar_banco_sql # Seu script de banco de dados
+import loader_nv as loader_sql # Script de carregamento (Loader)
 import unificar_planilhas_nv as unificar # Script de unificação
 
 def main():
@@ -62,7 +62,7 @@ def main():
     # --- PASSO 4: BANCO DE DADOS (SQL) ---
     print("\n>>> FASE 4: ATUALIZANDO BANCO SQL (DBeaver)...")
     try:
-        criar_banco_sql.criar_banco_dados()
+        loader_sql.criar_banco_dados()
     except Exception as e: print(f"❌ Falha no SQL: {e}")
 
     # --- RESUMO FINAL ---

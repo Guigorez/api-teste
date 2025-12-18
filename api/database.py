@@ -12,35 +12,28 @@ DB_PATHS = {
 
 def get_db_engine(company='animoshop'):
     """
-    Retorna uma ENGINE SQLAlchemy.
-    Suporta troca para PostgreSQL via variável de ambiente.
+    Retorna uma ENGINE SQLAlchemy sempre apontando para o SQLite local.
     """
     company = company.lower()
     
-    # Check env var specific for company, e.g., NOVOON_DATABASE_URL
-    env_key = f"{company.upper()}_DATABASE_URL"
-    db_url = os.getenv(env_key)
+    db_path = DB_PATHS.get(company)
+    if not db_path:
+        raise ValueError(f"Empresa desconhecida: {company}")
     
-    if not db_url:
-        # Fallback to SQLite file
-        db_path = DB_PATHS.get(company)
-        if not db_path:
-            raise ValueError(f"Empresa desconhecida: {company}")
-        
-        # SQLite connection string
-        db_url = f"sqlite:///{db_path}"
+    # SQLite connection string
+    db_url = f"sqlite:///{db_path}"
 
     try:
         engine = create_engine(db_url)
         return engine
     except Exception as e:
-        print(f"Erro ao criar engine para {company}: {e}")
+        print(f"Erro ao criar engine SQLite para {company}: {e}")
         raise e
 
 def get_db_connection(company='animoshop'):
     """
     Retorna uma conexão bruta (RAW) compatível com API legada.
-    Mas agora gerada via SQLAlchemy Engine.
+    Gerada via SQLAlchemy Engine para SQLite.
     """
     engine = get_db_engine(company)
     conn = engine.connect() # SQLAlchemy Connection

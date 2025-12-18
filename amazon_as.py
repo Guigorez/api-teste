@@ -1,6 +1,8 @@
 import pandas as pd
 import os
+import os
 import shutil
+from pathlib import Path
 from marketplace_base_as import MarketplaceBase
 
 class AmazonProcessor(MarketplaceBase):
@@ -37,44 +39,50 @@ class AmazonProcessor(MarketplaceBase):
         
         # Performance: Controle de arquivos processados
         self.files_to_move = []
-        self.processed_dir = os.path.join(self.input_folder, 'Processados')
-        if not os.path.exists(self.processed_dir):
-            try:
-                os.makedirs(self.processed_dir)
-            except Exception as e:
-                print(f"Erro ao criar pasta Processados: {e}")
-                self.processed_dir = None # Disable feature on error
+        self.processed_dir = Path(self.input_folder) / 'Processados'
+        
+        # Cria pasta se não existir
+        try:
+            self.processed_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"Erro ao criar pasta Processados: {e}")
+            self.processed_dir = None
 
     def load_data(self):
         print("="*80)
-        print(f"PROCESSANDO CONSOLIDAÇÃO {self.marketplace_name.upper()} (Otimizado)...")
+        print(f"PROCESSANDO CONSOLIDAÇÃO {self.marketplace_name.upper()} (Otimizado - Pathlib)...")
         
-        if not os.path.exists(self.input_folder):
-            print(f"❌ Pasta de entrada não encontrada: {self.input_folder}")
+        input_path = Path(self.input_folder)
+        if not input_path.exists():
+            print(f"❌ Pasta de entrada não encontrada: {input_path}")
             return
 
-        # Lista apenas arquivos na raiz (ignora pastas como Processados)
-        arquivos = [f for f in os.listdir(self.input_folder) 
-                   if os.path.isfile(os.path.join(self.input_folder, f)) 
-                   and f.endswith(('.csv', '.xlsx', '.xls'))]
+        # Lista arquivos na raiz (ignora pastas)
+        # Path.glob('*') pega tudo, filtramos por is_file() e extensão
+        arquivos = [
+            f for f in input_path.iterdir() 
+            if f.is_file() and f.suffix.lower() in ['.csv', '.xlsx', '.xls']
+        ]
         
         print(f"Encontrados {len(arquivos)} arquivos para processar.")
         
-        for file in arquivos:
-            caminho = os.path.join(self.input_folder, file)
+        for file_path in arquivos:
             try:
-                df = self._read_file(caminho)
+                # O método _read_file espera string ou path-like dependendo do pandas version, 
+                # mas vamos garantir string padrão se necessário ou passar objeto Path (pandas aceita)
+                df = self._read_file(str(file_path))
+                
                 if df is not None and not df.empty:
                     # Padroniza colunas
                     df.columns = df.columns.str.strip()
                     self.dfs.append(df)
-                    self.files_to_move.append(file) # Marca para mover no final
-                    print(f" -> Lido com sucesso: {file}")
+                    self.files_to_move.append(file_path) # Guarda objeto Path
+                    print(f" -> Lido com sucesso: {file_path.name}")
                 else:
-                    print(f" -> Arquivo vazio ou ilegível (ignorado): {file}")
+                    print(f" -> Arquivo vazio ou ilegível (ignorado): {file_path.name}")
             except Exception as e:
-                print(f"❌ ERRO CRÍTICO ao ler {file}: {e}")
-                # Não adiciona a files_to_move, então não será movido
+                print(f"❌ ERRO CRÍTICO ao ler {file_path.name}: {e}")
+                # Não adiciona a files_to_move
 
         if not self.dfs:
             print("❌ Nenhum arquivo novo processado.")
@@ -89,20 +97,17 @@ class AmazonProcessor(MarketplaceBase):
         print("\n" + "-"*40)
         print("Movendo arquivos processados...")
         count = 0
-        for file in self.files_to_move:
-            src = os.path.join(self.input_folder, file)
-            dst = os.path.join(self.processed_dir, file)
+        for src_path in self.files_to_move:
+            dst_path = self.processed_dir / src_path.name
             
             try:
-                if os.path.exists(dst):
-                    # Se já existe, renomeia com timestamp ou sobrescreve?
-                    # Para simplificar: Remove destino antigo e move novo
-                    os.remove(dst)
+                if dst_path.exists():
+                    dst_path.unlink() # Remove destino se existir
                 
-                shutil.move(src, dst)
+                shutil.move(str(src_path), str(dst_path))
                 count += 1
             except Exception as e:
-                print(f"Erro ao mover {file}: {e}")
+                print(f"Erro ao mover {src_path.name}: {e}")
         
         print(f"Arquivos movidos: {count}/{len(self.files_to_move)}")
         self.files_to_move = [] # Limpa lista

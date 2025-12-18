@@ -10,7 +10,7 @@ import magalu_as as magalu
 import madeira_madeira_as as madeira_madeira
 import olist_as as olist
 import atom_as as atom            # Seu script de conciliação
-import criar_banco_sql_as as criar_banco_sql # Seu script de banco de dados
+import loader_as as loader_sql # Script de carregamento (Loader)
 
 def main():
     inicio_total = time.time()
@@ -55,7 +55,7 @@ def main():
     # --- PASSO 3: BANCO DE DADOS (SQL) ---
     print("\n>>> FASE 3: ATUALIZANDO BANCO SQL (DBeaver)...")
     try:
-        criar_banco_sql.criar_banco_dados()
+        loader_sql.criar_banco_dados()
     except Exception as e: print(f"❌ Falha no SQL: {e}")
 
     # --- RESUMO FINAL ---

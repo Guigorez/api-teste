@@ -1,5 +1,7 @@
 import pandas as pd
 import os
+import shutil
+from pathlib import Path
 from marketplace_base_as import MarketplaceBase
 
 class MercadoLivreProcessor(MarketplaceBase):
@@ -105,6 +107,10 @@ class MercadoLivreProcessor(MarketplaceBase):
             self.df_final['dia'] = pd.NA
             self.df_final['mes'] = 'Desconhecido'
             self.df_final['ano'] = pd.NA
+
+    def process(self):
+        super().process() # Executa fluxo padrão da base
+        self.move_processed_files() # Executa movimentação no final
 
 def processar_mercadolivre():
     processor = MercadoLivreProcessor()
